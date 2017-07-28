@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import numpy as np
 from ._type import *
+import titanflow._session
 # from . import ndarray, gpu_op
 
 init_assigns = []
@@ -69,6 +70,9 @@ class Node(object):
 	def __str__(self):
 		"""Allow print to display node name."""
 		return self.name
+
+	def eval(self, feed_fict = {}):
+		return titanflow._session.sess_t.run(self, feed_fict)
 
 
 class Op(object):
@@ -448,10 +452,13 @@ class RandomNormalOp(Op):
 		return new_node
 
 	def compute(self, node, input_vals, output_val, use_numpy = True):
-		output_val[:] = np.zeros(node.shape, node.dtype)
+		if use_numpy:
+			output_val[:] = node.dtype().exchange(np.random.normal(node.mean, node.stddev, node.shape))
+		else:
+			assert False, "undo"
 
 	def gradient(self, node, output_grad):
-		return new.dtype().exchange(np.random.normal(node.mean, node.stddev, shape))
+		return [zeroslike(node.inputs[0])]
 
 	def infer_shape(self, node, input_shapes):
 		if len(node.shape) == 0:
@@ -627,50 +634,6 @@ class BroadcastToOp(Op):
 
 	def infer_shape(self, node, input_shapes):
 		return input_shapes[1]
-
-
-class ReluOp(Op):
-	def __call__(self, node_A):
-		new_node = Op.__call__(self)
-		new_node.inputs = [node_A]
-		new_node.name = "Relu(%s)" % (node_A.name)
-		return new_node
-
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = np.maximum(input_vals[0], 0)
-		else:
-			gpu_op.relu(input_vals[0], output_val)
-
-	def gradient(self, node, output_grad):
-		return [relu_gradient(node.inputs[0], output_grad)]
-
-	def infer_shape(self, node, input_shapes):
-		return input_shapes[0]
-
-
-class ReluGradientOp(Op):
-	def __call__(self, node_A, node_B):
-		"""node_B is output_grad"""
-		new_node = Op.__call__(self)
-		new_node.inputs = [node_A, node_B]
-		new_node.name = "ReluGradient(%s)" % (node_A.name)
-		return new_node
-
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		assert len(input_vals) == 2
-		if use_numpy:
-			# heaviside function, 0.5 at x=0
-			output_val[:] = (np.sign(input_vals[0]) + 1) * 0.5 * input_vals[1]
-		else:
-			gpu_op.relu_gradient(input_vals[0], input_vals[1], output_val)
-
-	def gradient(self, node, output_grad):
-		raise NotImplementedError
-
-	def infer_shape(self, node, input_shapes):
-		return input_shapes[0]
 
 
 class Initializer(Op):
@@ -873,14 +836,18 @@ class CastOp(Op):
 	def __call__(self, input, dtype = None, name = None):
 		new_node = Op.__call__(self)
 		new_node.inputs = [input]
-		new_node.dtype = dtype
+		if dtype == "float":
+			new_node.dtype = float32
+		else:
+			new_node.dtype = dtype
 		new_node.name = "ArgMax(%s)" % (input.name)
 		return new_node
 
 	def compute(self, node, input_vals, output_val, use_numpy = True):
 		assert len(input_vals) == 1
 		if use_numpy:
-			output_val[:] = node.dtype().exchange(input_vals[0])
+			if node.dtype != None:
+				output_val[:] = node.dtype().exchange(input_vals[0])
 		else:
 			assert False, "undo"
 			gpu_op.relu(input_vals[0], output_val)
@@ -944,8 +911,6 @@ reduce_sum_op = ReduceSum_Op()
 reduce_sum = ReduceSumOp()
 reduce_mean = ReduceMeanOp()
 broadcastto = BroadcastToOp()
-relu = ReluOp()
-relu_gradient = ReluGradientOp()
 global_variables_initializer = Initializer()
 Variable = VariableOp()
 assign = AssignOp()

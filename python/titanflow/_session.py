@@ -167,7 +167,8 @@ class Session(object):
 			for i in range(len(ans)):
 				if len(ans[i]) == 1:
 					ans[i] = ans[i][0]
+			return ans
 		else:
 			return node_to_val_map[eval_node_list]
 
-
+sess_t = Session()
