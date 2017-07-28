@@ -182,8 +182,6 @@ class AddOp(Op):
 						input_vals[1], const_val, output_val)
 
 	def gradient(self, node, output_grad):
-		A = nodeshape(node.inputs[0])
-		B = nodeshape(node.inputs[1])
 		return [reduce_sum_op(output_grad, node.inputs[0]), reduce_sum_op(output_grad, node.inputs[1])]
 
 	def infer_shape(self, node, input_shapes):
@@ -210,7 +208,7 @@ class SubOp(Op):
 			assert False, "undo"
 
 	def gradient(self, node, output_grad):
-		return [output_grad, -output_grad]
+		return [reduce_sum_op(output_grad, node.inputs[0]), reduce_sum_op(-output_grad, node.inputs[1])]
 
 	def infer_shape(self, node, input_shapes):
 		"""Need to handle input_vals[0].shape != input_vals[1].shape"""
@@ -246,7 +244,8 @@ class MulOp(Op):
 						input_vals[1], const_val, output_val)
 
 	def gradient(self, node, output_grad):
-		return [node.inputs[1] * output_grad, node.inputs[0] * output_grad]
+		return [reduce_sum_op(node.inputs[1] * output_grad, node.inputs[0]),
+				reduce_sum_op(node.inputs[0] * output_grad, node.inputs[1])]
 
 	def infer_shape(self, node, input_shapes):
 		"""Need to handle input_vals[0].shape != input_vals[1].shape"""
@@ -605,57 +604,6 @@ class BroadcastToOp(Op):
 
 	def infer_shape(self, node, input_shapes):
 		return input_shapes[1]
-
-
-class SoftmaxCrossEntropyOp(Op):
-	def __call__(self, node_A, node_B):
-		new_node = Op.__call__(self)
-		new_node.inputs = [node_A, node_B]
-		new_node.name = "SoftmaxXEntropy(%s,%s)" % (node_A.name, node_B.name)
-		return new_node
-
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		assert len(input_vals) == 2
-		y = input_vals[0]
-		y_ = input_vals[1]
-		if use_numpy:
-			softmax = softmax_func(y)
-			cross_entropy = np.mean(
-				-np.sum(y_ * np.log(softmax), axis = 1), keepdims = True)
-			output_val[:] = cross_entropy
-		else:
-			gpu_op.softmax_cross_entropy(y, y_, output_val)
-
-	def gradient(self, node, output_grad):
-		grad_A = (softmax(node.inputs[0]) + -1 * node.inputs[1]) * output_grad
-		grad_B = zeroslike(node.inputs[1])
-		return [grad_A, grad_B]
-
-	def infer_shape(self, node, input_shapes):
-		return (1,)
-
-
-class SoftmaxOp(Op):
-	def __call__(self, node_A):
-		new_node = Op.__call__(self)
-		new_node.inputs = [node_A]
-		new_node.name = "Softmax(%s)" % (node_A.name)
-		return new_node
-
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = softmax_func(input_vals[0])
-		else:
-			gpu_op.softmax(input_vals[0], output_val)
-
-	def gradient(self, node, output_grad):
-		# Do not directly use SoftmaxOp, use SoftmaxCrossEntropyOp instead.
-		# Not allowing taking 2nd derivative of SoftmaxCrossEntropyOp.
-		raise NotImplementedError
-
-	def infer_shape(self, node, input_shapes):
-		return input_shapes[0]
 
 
 class ReluOp(Op):
