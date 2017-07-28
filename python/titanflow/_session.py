@@ -2,7 +2,7 @@ import numpy as np
 # from . import ndarray, gpu_op
 from .ops import *
 
-f = open('log.txt', 'w')
+# f = open('log.txt', 'w')
 class Session(object):
 	def __init__(self, ctx = None):
 		"""

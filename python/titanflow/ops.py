@@ -6,6 +6,7 @@ from ._type import *
 # from . import ndarray, gpu_op
 
 init_assigns = []
+all_var = []
 
 class Node(object):
 	"""Node in a computation graph."""
@@ -705,6 +706,7 @@ class VariableOp(Op):
 		new_node.value = None
 		assign_node = assign(new_node, initial_value)
 		init_assigns.append(assign_node)
+		all_var.append(new_node)
 		return new_node
 
 	def compute(self, node, input_vals, output_val, use_numpy = True):
@@ -886,6 +888,25 @@ class NodeShapeOp(Op):
 	def infer_shape(self, node, input_shapes):
 		return (1, )
 
+
+class RunnerOp(Op):
+	def __call__(self, input_list):
+		new_node = Op.__call__(self)
+		new_node.inputs = input_list
+		new_node.name = "initializer"
+		return new_node
+
+	def compute(self, node, input_vals, output_val, use_numpy = True):
+		pass
+
+	def gradient(self, node, output_grad):
+		raise NotImplementedError
+
+	def infer_shape(self, node, input_shapes):
+		return (1, )
+
+
+
 # Create global singletons of operators.
 add = AddOp()
 sub = SubOp()
@@ -913,7 +934,7 @@ equal = EqualOp()
 argmax = ArgMaxOp()
 cast = CastOp()
 nodeshape = NodeShapeOp()
-
+runner = RunnerOp()
 
 def gradients(output_node, node_list):
 	"""Take gradient of output node with respect to each node in node_list.

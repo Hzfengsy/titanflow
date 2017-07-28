@@ -7,5 +7,5 @@ class type(object):
 
 class float32(type):
 	def exchange(self, input):
-		return input.astype(np.float64)
+		return input.astype(np.float32)
 
