@@ -1,24 +1,27 @@
 import os
 import sys
 
-python_cmd = "python3"
+python_cmd = "python"
 testcase_dir = "testcase"
 tests = [
-    #["session", "session.py"],
-    ["adder",       "adder.py"],
-    ["initializer", "init.py"],
-    ["assign",      "assign.py"],
-    ["autodiff",    "mnist_grad.py"],
-    ["optimizer",   "mnist_optimizer.py"],
-    ["multilayer perceptron", "ml_perceptron.py"],
+    ["adder",       "1_adder.py"],
+    ["initializer", "2_init.py"],
+    ["assign",      "3_assign.py"],
+    ["context",     "4_context.py"],
+    ["autodiff",    "5_mnist_grad.py"],
+    ["optimizer",   "6_mnist_optimizer.py"],
+    ["multilayer perceptron", "7_ml_perceptron.py"],
+    ["adam optimizer",        "8_adam.py"],
+    ["CNN 1",       "9_cnn_1.py"],
+    ["CNN 2",       "10_cnn_2.py"]
 ]
 
 def main(model_name):
-    for item in tests:
+    for i, item in enumerate(tests):
         test_name = item[0]
         file_name = item[1]
 
-        print("========== test %s ==========" % test_name)
+        print("========== test %d %s ==========" % (i, test_name))
 
         os.system("cp %s %s" % (os.path.join(testcase_dir, file_name),
                                                     file_name))
