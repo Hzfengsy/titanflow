@@ -163,7 +163,10 @@ class Session(object):
 		if not use_numpy and convert_to_numpy_ret_vals:
 			return [node_to_val_map[n].asnumpy() for n in self.eval_node_list]
 		if isinstance(eval_node_list, list):
-			return [node_to_val_map[n] for n in self.eval_node_list]
+			ans = [node_to_val_map[n] for n in self.eval_node_list]
+			for i in range(len(ans)):
+				if len(ans[i]) == 1:
+					ans[i] = ans[i][0]
 		else:
 			return node_to_val_map[eval_node_list]
 

@@ -437,6 +437,28 @@ class OnesLikeOp(Op):
 		return input_shapes[0]
 
 
+class RandomNormalOp(Op):
+	def __call__(self, shape, mean = 0.0, stddev=1.0, dtype = float32, name = None):
+		new_node = Op.__call__(self)
+		new_node.name = "zeros %s" % name
+		new_node.shape = shape
+		new_node.dtype = dtype
+		new_node.mean = mean
+		new_node.stddev = stddev
+		return new_node
+
+	def compute(self, node, input_vals, output_val, use_numpy = True):
+		output_val[:] = np.zeros(node.shape, node.dtype)
+
+	def gradient(self, node, output_grad):
+		return new.dtype().exchange(np.random.normal(node.mean, node.stddev, shape))
+
+	def infer_shape(self, node, input_shapes):
+		if len(node.shape) == 0:
+			return (1, )
+		return node.shape
+
+
 class ReduceSum_Op(Op):
 	def __call__(self, node_A, node_B, name = None):
 		"""Creates a node that represents sum(node_A) to shape node_B.shape"""
@@ -578,7 +600,7 @@ class BroadcastToOp(Op):
 
 	def compute(self, node, input_vals, output_val, use_numpy = True):
 		assert (len(input_vals) == 2)
-		assert input_vals[0].shape != input_vals[1].shape, (node.inputs[0].name, node.inputs[1].name)
+		# assert input_vals[0].shape != input_vals[1].shape, (node.inputs[0].name, node.inputs[1].name)
 		if use_numpy:
 			tmp = input_vals[0]
 			# not complete yet
@@ -906,7 +928,6 @@ class RunnerOp(Op):
 		return (1, )
 
 
-
 # Create global singletons of operators.
 add = AddOp()
 sub = SubOp()
@@ -918,6 +939,7 @@ placeholder = PlaceholderOp()
 ones_like = OnesLikeOp()
 zeros_like = ZerosLikeOp()
 zeros = ZerosOp()
+random_normal = RandomNormalOp()
 reduce_sum_op = ReduceSum_Op()
 reduce_sum = ReduceSumOp()
 reduce_mean = ReduceMeanOp()
