@@ -16,16 +16,13 @@ class SoftmaxCrossEntropyOp(Op):
 		new_node.dim = dim
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
 		y = input_vals[0]
 		y_ = input_vals[1]
-		if use_numpy:
-			Softmax = softmax_func(y)
-			cross_entropy = np.mean(-np.sum(y_ * np.log(Softmax), axis = node.dim), keepdims = True)
-			output_val[:] = cross_entropy
-		else:
-			assert False, "undo"
+		Softmax = softmax_func(y)
+		cross_entropy = np.mean(-np.sum(y_ * np.log(Softmax), axis = node.dim), keepdims = True)
+		return cross_entropy
 
 	def gradient(self, node, output_grad):
 		grad_A = (softmax_op(node.inputs[0]) + -1 * node.inputs[1]) * output_grad
@@ -43,12 +40,9 @@ class SoftmaxOp(Op):
 		new_node.name = "Softmax(%s)" % (node_A.name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = softmax_func(input_vals[0])
-		else:
-			gpu_op.softmax(input_vals[0], output_val)
+		return softmax_func(input_vals[0])
 
 	def gradient(self, node, output_grad):
 		# Do not directly use SoftmaxOp, use SoftmaxCrossEntropyOp instead.
@@ -66,12 +60,8 @@ class ReluOp(Op):
 		new_node.name = "Relu(%s)" % (node_A.name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = np.maximum(input_vals[0], 0)
-		else:
-			gpu_op.relu(input_vals[0], output_val)
+	def compute(self, node, input_vals):
+		return np.maximum(input_vals[0], 0)
 
 	def gradient(self, node, output_grad):
 		return [relu_gradient(node.inputs[0], output_grad)]
@@ -88,13 +78,9 @@ class ReluGradientOp(Op):
 		new_node.name = "ReluGradient(%s)" % (node_A.name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		if use_numpy:
-			# heaviside function, 0.5 at x=0
-			output_val[:] = (np.sign(input_vals[0]) + 1) * 0.5 * input_vals[1]
-		else:
-			gpu_op.relu_gradient(input_vals[0], input_vals[1], output_val)
+		return (np.sign(input_vals[0]) + 1) * 0.5 * input_vals[1]
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError

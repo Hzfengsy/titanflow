@@ -121,42 +121,35 @@ class Session(object):
 					assert False, "feed_dict value type not supported"
 		
 		# collect shapes for all placeholders
-		feed_shapes = {}
-		for node in node_to_val_map:
-			if len(node_to_val_map[node].shape) == 0:
-				feed_shapes[node] = (1, )
-			else:
-				feed_shapes[node] = node_to_val_map[node].shape
-			# if node.shape != None:
-			# 	print node.shape
-			# 	print feed_shapes[node]
-			# 	assert feed_shapes[node] == node.shape
+		# feed_shapes = {}
+		# for node in node_to_val_map:
+		# 	if len(node_to_val_map[node].shape) == 0:
+		# 		feed_shapes[node] = (1, )
+		# 	else:
+		# 		feed_shapes[node] = node_to_val_map[node].shape
+		# 	# if node.shape != None:
+		# 	# 	print node.shape
+		# 	# 	print feed_shapes[node]
+		# 	# 	assert feed_shapes[node] == node.shape
 			
 
-		# infer shape if feed_shapes changed since last run
-		# e.g. call run() on test data after trainng
-		if (not self.last_eval == self.eval_node_list) | (not are_feed_shapes_equal(feed_shapes, self.feed_shapes)):
-			self.infer_shape(feed_shapes)
-			self.feed_shapes = feed_shapes
-			# plan memory if using GPU
-			if (not use_numpy):
-				self.memory_plan(feed_shapes)
+		# # infer shape if feed_shapes changed since last run
+		# # e.g. call run() on test data after trainng
+		# if (not self.last_eval == self.eval_node_list) | (not are_feed_shapes_equal(feed_shapes, self.feed_shapes)):
+		# 	self.infer_shape(feed_shapes)
+		# 	self.feed_shapes = feed_shapes
+		# 	# plan memory if using GPU
+		# 	if (not use_numpy):
+		# 		self.memory_plan(feed_shapes)
 		# Traverse graph in topo order and compute values for all nodes.
 		for node in self.topo_order:
 			if node in node_to_val_map:
 				# Skip placeholder nodes. Values already provided by feed_dict.
 				continue
 			input_vals = [node_to_val_map[n] for n in node.inputs]
-			if use_numpy:
-				node_val = np.empty(shape = self.node_to_shape_map[node])
-			else:
-				node_val = self.node_to_arr_map[node]
 			# node_val is modified in-place whether np.ndarray or NDArray
-			# f.write(node.name + '\n')
-			node.op.compute(node, input_vals, node_val, use_numpy)
+			node_val = node.op.compute(node, input_vals)
 			node_to_val_map[node] = node_val
-			# np.savetxt(f, node_val)
-			# f.write('\n')
 
 		self.last_eval = self.eval_node_list
 		# Collect node values.
@@ -164,9 +157,6 @@ class Session(object):
 			return [node_to_val_map[n].asnumpy() for n in self.eval_node_list]
 		if isinstance(eval_node_list, list):
 			ans = [node_to_val_map[n] for n in self.eval_node_list]
-			for i in range(len(ans)):
-				if len(ans[i]) == 1:
-					ans[i] = ans[i][0]
 			return ans
 		else:
 			return node_to_val_map[eval_node_list]

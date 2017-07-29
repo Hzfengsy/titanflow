@@ -89,7 +89,7 @@ class Op(object):
 		new_node.op = self
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		"""Given values of input nodes, compute the output value.
 
 		Parameters
@@ -142,13 +142,9 @@ class NegOp(Op):
 		new_node.inputs = [input]
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			# output_val[:] allows modify in-place
-			output_val[:] = -input_vals[0]
-		else:
-			assert False, "undo"
+		return -input_vals[0]
 
 	def gradient(self, node, output_grad):
 		return [-output_grad]
@@ -158,7 +154,6 @@ class NegOp(Op):
 
 
 class AddOp(Op):
-
 	def __call__(self, node_A, node_B):
 		new_node = Op.__call__(self)
 		if not isinstance(node_B, Node):
@@ -167,24 +162,9 @@ class AddOp(Op):
 		new_node.inputs = [node_A, node_B]
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		if use_numpy:
-			# output_val[:] allows modify in-place
-			output_val[:] = input_vals[0] + input_vals[1]
-		else:
-			if input_vals[0].shape == input_vals[1].shape:
-				gpu_op.matrix_elementwise_add(
-					input_vals[0], input_vals[1], output_val)
-			else:
-				if input_vals[1].shape == (1,):
-					const_val = input_vals[1].asnumpy()[0]
-					gpu_op.matrix_elementwise_add_by_const(
-						input_vals[0], const_val, output_val)
-				elif input_vals[0].shape == (1,):
-					const_val = input_vals[0].asnumpy()[0]
-					gpu_op.matrix_elementwise_add_by_const(
-						input_vals[1], const_val, output_val)
+		return input_vals[0] + input_vals[1]
 
 	def gradient(self, node, output_grad):
 		return [reduce_sum_op(output_grad, node.inputs[0]), reduce_sum_op(output_grad, node.inputs[1])]
@@ -200,17 +180,15 @@ class SubOp(Op):
 		new_node = Op.__call__(self)
 		if not isinstance(node_B, Node):
 			node_B = constant(node_B)
+		if not isinstance(node_A, Node):
+			node_A = constant(node_A)
 		new_node.name = "(%s - %s)" % (node_A.name, node_B.name)
 		new_node.inputs = [node_A, node_B]
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		if use_numpy:
-			# output_val[:] allows modify in-place
-			output_val[:] = input_vals[0] - input_vals[1]
-		else:
-			assert False, "undo"
+		return input_vals[0] - input_vals[1]
 
 	def gradient(self, node, output_grad):
 		return [reduce_sum_op(output_grad, node.inputs[0]), reduce_sum_op(-output_grad, node.inputs[1])]
@@ -230,23 +208,9 @@ class MulOp(Op):
 		new_node.inputs = [node_A, node_B]
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		if use_numpy:
-			output_val[:] = input_vals[0] * input_vals[1]
-		else:
-			if input_vals[0].shape == input_vals[1].shape:
-				gpu_op.matrix_elementwise_multiply(
-					input_vals[0], input_vals[1], output_val)
-			else:
-				if input_vals[1].shape == (1,):
-					const_val = input_vals[1].asnumpy()[0]
-					gpu_op.matrix_elementwise_multiply_by_const(
-						input_vals[0], const_val, output_val)
-				elif input_vals[0].shape == (1,):
-					const_val = input_vals[0].asnumpy()[0]
-					gpu_op.matrix_elementwise_multiply_by_const(
-						input_vals[1], const_val, output_val)
+		return input_vals[0] * input_vals[1]
 
 	def gradient(self, node, output_grad):
 		return [reduce_sum_op(node.inputs[1] * output_grad, node.inputs[0]),
@@ -263,16 +227,15 @@ class DivOp(Op):
 		new_node = Op.__call__(self)
 		if not isinstance(node_B, Node):
 			node_B = constant(node_B)
+		if not isinstance(node_A, Node):
+			node_A = constant(node_A)
 		new_node.name = "(%s / %s)" % (node_A.name, node_B.name)
 		new_node.inputs = [node_A, node_B]
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		if use_numpy:
-			output_val[:] = input_vals[0] / input_vals[1]
-		else:
-			assert False, "undo"
+		return input_vals[0] / input_vals[1]
 
 	def gradient(self, node, output_grad):
 		return [reduce_sum_op(output_grad / node.inputs[1], node.inputs[0]),
@@ -294,58 +257,33 @@ class MatMulOp(Op):
 			node_A.name, node_B.name, str(trans_A), str(trans_B))
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		if use_numpy:
-			if ((node.matmul_attr_trans_A is False) and
-					(node.matmul_attr_trans_B is False)):
-				output_val[:] = np.matmul(input_vals[0], input_vals[1])
-			elif ((node.matmul_attr_trans_A is True) and
-					  (node.matmul_attr_trans_B is False)):
-				output_val[:] = np.matmul(
-					np.transpose(input_vals[0]), input_vals[1])
-			elif ((node.matmul_attr_trans_A is False) and
-					  (node.matmul_attr_trans_B is True)):
-				output_val[:] = np.matmul(
-					input_vals[0], np.transpose(input_vals[1]))
-			elif ((node.matmul_attr_trans_A is True) and
-					  (node.matmul_attr_trans_B is True)):
-				output_val[:] = np.matmul(
-					np.transpose(input_vals[0]), np.transpose(input_vals[1]))
-		else:
-			gpu_op.matrix_multiply(
-				input_vals[0], node.matmul_attr_trans_A,
-				input_vals[1], node.matmul_attr_trans_B,
-				output_val)
+	def compute(self, node, input_vals):
+		if ((node.matmul_attr_trans_A is False) and (node.matmul_attr_trans_B is False)):
+			return np.matmul(input_vals[0], input_vals[1])
+		elif ((node.matmul_attr_trans_A is True) and (node.matmul_attr_trans_B is False)):
+			return np.matmul(np.transpose(input_vals[0]), input_vals[1])
+		elif ((node.matmul_attr_trans_A is False) and (node.matmul_attr_trans_B is True)):
+			return np.matmul(input_vals[0], np.transpose(input_vals[1]))
+		elif ((node.matmul_attr_trans_A is True) and (node.matmul_attr_trans_B is True)):
+			return np.matmul(np.transpose(input_vals[0]), np.transpose(input_vals[1]))
 
 	def gradient(self, node, output_grad):
-		if ((node.matmul_attr_trans_A is False) and
-				(node.matmul_attr_trans_B is False)):
+		if ((node.matmul_attr_trans_A is False) and (node.matmul_attr_trans_B is False)):
 			# if Y=AB, then dA=dY B^T, dB=A^T dY
-			lhs_grad = matmul(
-				output_grad, node.inputs[1], trans_A = False, trans_B = True)
-			rhs_grad = matmul(
-				node.inputs[0], output_grad, trans_A = True, trans_B = False)
-		elif ((node.matmul_attr_trans_A is True) and
-				  (node.matmul_attr_trans_B is False)):
+			lhs_grad = matmul(output_grad, node.inputs[1], trans_A = False, trans_B = True)
+			rhs_grad = matmul(node.inputs[0], output_grad, trans_A = True, trans_B = False)
+		elif ((node.matmul_attr_trans_A is True) and (node.matmul_attr_trans_B is False)):
 			# if Y=A^T B, then dA=(dY B^T)^T=B dY^T, dB=A^T dY
-			lhs_grad = matmul(
-				node.inputs[1], output_grad, trans_A = False, trans_B = True)
-			rhs_grad = matmul(
-				node.inputs[0], output_grad, trans_A = True, trans_B = False)
-		elif ((node.matmul_attr_trans_A is False) and
-				  (node.matmul_attr_trans_B is True)):
+			lhs_grad = matmul(node.inputs[1], output_grad, trans_A = False, trans_B = True)
+			rhs_grad = matmul(node.inputs[0], output_grad, trans_A = True, trans_B = False)
+		elif ((node.matmul_attr_trans_A is False) and (node.matmul_attr_trans_B is True)):
 			# if Y=A B^T, then dA=dY B^T, dB=(A^T dY)^T=dY^T A
-			lhs_grad = matmul(
-				output_grad, node.inputs[1], trans_A = False, trans_B = True)
-			rhs_grad = matmul(
-				output_grad, node.inputs[0], trans_A = True, trans_B = False)
-		elif ((node.matmul_attr_trans_A is True) and
-				  (node.matmul_attr_trans_B is True)):
+			lhs_grad = matmul(output_grad, node.inputs[1], trans_A = False, trans_B = True)
+			rhs_grad = matmul(output_grad, node.inputs[0], trans_A = True, trans_B = False)
+		elif ((node.matmul_attr_trans_A is True) and (node.matmul_attr_trans_B is True)):
 			# if Y=A^T B^T, then dA=(dY B^T)^T=B dY^T, dB=(A^T dY)^T=dY^T A
-			lhs_grad = matmul(
-				node.inputs[1], output_grad, trans_A = False, trans_B = True)
-			rhs_grad = matmul(
-				output_grad, node.inputs[0], trans_A = True, trans_B = False)
+			lhs_grad = matmul(node.inputs[1], output_grad, trans_A = False, trans_B = True)
+			rhs_grad = matmul(output_grad, node.inputs[0], trans_A = True, trans_B = False)
 		return [lhs_grad, rhs_grad]
 
 	def infer_shape(self, node, input_shapes):
@@ -367,7 +305,7 @@ class PlaceholderOp(Op):
 		new_node.name = "placeholder(%s)" % name
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert False, "placeholder %s values provided by feed_dict" % node.name
 
 	def gradient(self, node, output_grad):
@@ -385,12 +323,9 @@ class ZerosLikeOp(Op):
 		new_node.name = "Zeroslike(%s)" % node_A.name
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = np.zeros(input_vals[0].shape)
-		else:
-			gpu_op.array_set(output_val, 0)
+		return np.zeros(input_vals[0].shape)
 
 	def gradient(self, node, output_grad):
 		return [zeroslike(node.inputs[0])]
@@ -403,12 +338,12 @@ class ZerosOp(Op):
 	def __call__(self, shape, dtype = float32, name = None):
 		new_node = Op.__call__(self)
 		new_node.name = "zeros %s" % name
-		new_node.shape = shape
+		new_node.shape = tuple(shape)
 		new_node.dtype = dtype
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		output_val[:] = np.zeros(node.shape, node.dtype)
+	def compute(self, node, input_vals):
+		return np.zeros(node.shape, node.dtype)
 
 	def gradient(self, node, output_grad):
 		return np.zeros(node.shape, node.dtype)
@@ -427,12 +362,9 @@ class OnesLikeOp(Op):
 		new_node.name = "Oneslike(%s)" % node_A.name
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = np.ones(input_vals[0].shape)
-		else:
-			gpu_op.array_set(output_val, 1)
+		return np.ones(input_vals[0].shape)
 
 	def gradient(self, node, output_grad):
 		return [zeroslike(node.inputs[0])]
@@ -451,11 +383,8 @@ class RandomNormalOp(Op):
 		new_node.stddev = stddev
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		if use_numpy:
-			output_val[:] = node.dtype().exchange(np.random.normal(node.mean, node.stddev, node.shape))
-		else:
-			assert False, "undo"
+	def compute(self, node, input_vals):
+		return node.dtype().exchange(np.random.normal(node.mean, node.stddev, node.shape))
 
 	def gradient(self, node, output_grad):
 		return [zeroslike(node.inputs[0])]
@@ -474,20 +403,16 @@ class ReduceSum_Op(Op):
 		new_node.name = "ReduceSum(%s, %s)" % (node_A, node_B)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		
-		if use_numpy:
-			ans = input_vals[0]
-			while len(ans.shape) > len(input_vals[1].shape):
-				ans = np.sum(ans, axis = 0)
-			for dim in range(len(ans.shape)):
-				if ans.shape[dim] > input_vals[1].shape[dim]:
-					assert input_vals[1].shape[dim] == 1
-					ans = np.sum(ans, axis = dim, keepdims = True)
-			output_val[:] = ans
-		else:
-			assert False, "undo"
+		ans = input_vals[0]
+		while len(ans.shape) > len(input_vals[1].shape):
+			ans = np.sum(ans, axis = 0)
+		for dim in range(len(ans.shape)):
+			if ans.shape[dim] > input_vals[1].shape[dim]:
+				assert input_vals[1].shape[dim] == 1
+				ans = np.sum(ans, axis = dim, keepdims = True)
+		return ans
 
 	def gradient(self, node, output_grad):
 		return [broadcastto(output_grad, node.inputs[0])]
@@ -515,16 +440,13 @@ class ReduceSumOp(Op):
 		new_node.name = "ReduceSum(%s, name = %s)" % (input, name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			if isinstance(node.axis, list):
-				axis = tuple(node.axis)
-			else:
-				axis = node.axis
-			output_val[:] = np.sum(input_vals[0], axis = axis, keepdims = node.keep_dims)
+		if isinstance(node.axis, list):
+			axis = tuple(node.axis)
 		else:
-			assert False, "undo"
+			axis = node.axis
+		return np.sum(input_vals[0], axis = axis, keepdims = node.keep_dims)
 
 	def gradient(self, node, output_grad):
 		return [broadcastto(output_grad, node.inputs[0])]
@@ -562,16 +484,13 @@ class ReduceMeanOp(Op):
 		new_node.name = "ReduceMean(%s, name = %s)" % (input, name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			if isinstance(node.axis, list):
-				axis = tuple(node.axis)
-			else:
-				axis = node.axis
-			output_val[:] = np.mean(input_vals[0], axis = axis, keepdims = node.keep_dims)
+		if isinstance(node.axis, list):
+			axis = tuple(node.axis)
 		else:
-			assert False, "undo"
+			axis = node.axis
+		return np.mean(input_vals[0], axis = axis, keepdims = node.keep_dims)
 
 	def gradient(self, node, output_grad):
 		W = reduce_sum(ones_like(node.inputs[0]), axis = node.axis, keep_dims = node.keep_dims)
@@ -605,26 +524,22 @@ class BroadcastToOp(Op):
 		new_node.name = "BroadcastTo(%s, %s.shape)" % (node_A.name, node_B.name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert (len(input_vals) == 2)
-		# assert input_vals[0].shape != input_vals[1].shape, (node.inputs[0].name, node.inputs[1].name)
-		if use_numpy:
-			tmp = input_vals[0]
-			# not complete yet
-			if len(tmp.shape) < len(input_vals[1].shape):
-				front_align = True
-				for dim, in_size in enumerate(tmp.shape):
-					if input_vals[1].shape[dim] != in_size:
-						front_align = False
-						break
-				new_shape = tmp.shape
-				if front_align:
-					while len(new_shape) < len(input_vals[1].shape):
-						new_shape = new_shape + (1, )
-				tmp.resize(new_shape)
-			output_val[:] = np.broadcast_to(tmp, input_vals[1].shape)
-		else:
-			gpu_op.broadcast_to(input_vals[0], output_val)
+		tmp = input_vals[0]
+		# not complete yet
+		if len(tmp.shape) < len(input_vals[1].shape):
+			front_align = True
+			for dim, in_size in enumerate(tmp.shape):
+				if input_vals[1].shape[dim] != in_size:
+					front_align = False
+					break
+			new_shape = tmp.shape
+			if front_align:
+				while len(new_shape) < len(input_vals[1].shape):
+					new_shape = new_shape + (1, )
+			tmp.resize(new_shape)
+		return np.broadcast_to(tmp, input_vals[1].shape)
 
 	def gradient(self, node, output_grad):
 		assert False, "undo"
@@ -643,8 +558,8 @@ class Initializer(Op):
 		new_node.name = "global variables initializer"
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		pass
+	def compute(self, node, input_vals):
+		return None
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
@@ -665,19 +580,16 @@ class AssignOp(Op):
 			new_node.inputs = [input]
 			new_node.name = "assign(%s, %s)" % (var.name, input)
 		return new_node
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			# output_val[:] allows modify in-place
-			node.var.value = input_vals[0]
-			output_val[:] = node.var.value
-		else:
-			assert False, "undo"
+		node.var.value = input_vals[0]
+		return node.var.value
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
 
 	def infer_shape(self, node, input_shapes):
+		node.var.shape = input_shapes[0]
 		return input_shapes[0]
 
 class VariableOp(Op):
@@ -694,14 +606,14 @@ class VariableOp(Op):
 		all_var.append(new_node)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		output_val[:] = node.dtype().exchange(node.value)
+	def compute(self, node, input_vals):
+		return node.dtype().exchange(node.value)
 
 	def gradient(self, node, output_grad):
 		return None
 
 	def infer_shape(self, node, input_shapes):
-		return node.value.shape
+		return node.shape
 
 
 class ConstantOp(Op):
@@ -716,8 +628,7 @@ class ConstantOp(Op):
 			new_node.shape = new_node.value.shape
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		output_val[:] = node.value
+	def compute(self, node, input_vals):
 		return node.value
 
 	def gradient(self, node, output_grad):
@@ -737,12 +648,9 @@ class ExpOp(Op):
 		new_node.inputs = [input]
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = np.exp(input_vals[0])
-		else:
-			assert False, "undo"
+		return np.exp(input_vals[0])
 
 	def gradient(self, node, output_grad):
 		return [output_grad * exp(node.inputs[0])]
@@ -751,6 +659,53 @@ class ExpOp(Op):
 		"""Need to handle input_vals[0].shape != input_vals[1].shape"""
 		assert len(input_shapes) == 1
 		return input_shapes[0]
+
+class SqrtOp(Op):
+	def __call__(self, input):
+		new_node = Op.__call__(self)
+		if not isinstance(input, Node):
+			input = constant(input)
+		new_node.name = "sqrt(%s)" % (input.name)
+		new_node.inputs = [input]
+		return new_node
+
+	def compute(self, node, input_vals):
+		assert len(input_vals) == 1
+		return np.sqrt(input_vals[0])
+
+	def gradient(self, node, output_grad):
+		return [output_grad / sqrt(node.inputs[0])]
+
+	def infer_shape(self, node, input_shapes):
+		"""Need to handle input_vals[0].shape != input_vals[1].shape"""
+		assert len(input_shapes) == 1
+		return input_shapes[0]
+
+class PowOp(Op):
+	def __call__(self, node_A, node_B):
+		new_node = Op.__call__(self)
+		if not isinstance(node_B, Node):
+			node_B = constant(node_B)
+		if not isinstance(node_A, Node):
+			node_A = constant(node_A)
+		new_node.name = "(%s ^ %s)" % (node_A.name, node_B.name)
+		new_node.inputs = [node_A, node_B]
+		return new_node
+
+	def compute(self, node, input_vals):
+		assert len(input_vals) == 2
+		return np.power(input_vals[0], input_vals[1])
+
+	def gradient(self, node, output_grad):
+		a = node.inputs[0]
+		b = node.inputs[1]
+		return [reduce_sum_op(output_grad * b * pow(a, b - 1), a), 
+				reduce_sum_op(output_grad * pow(a, b) * log(a), node.inputs[1])]
+
+	def infer_shape(self, node, input_shapes):
+		"""Need to handle input_vals[0].shape != input_vals[1].shape"""
+		assert len(input_shapes) == 2
+		return broadcast_rule(input_shapes[0], input_shapes[1])
 
 
 class LogOp(Op):
@@ -762,12 +717,9 @@ class LogOp(Op):
 		new_node.inputs = [input]
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = np.log(input_vals[0])
-		else:
-			assert False, "undo"
+		return np.log(input_vals[0])
 
 	def gradient(self, node, output_grad):
 		return [output_grad / node.inputs[0]]
@@ -785,12 +737,9 @@ class EqualOp(Op):
 		new_node.name = "Equal(%s)" % (node_A.name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		if use_numpy:
-			output_val[:] = np.equal(input_vals[0], input_vals[1])
-		else:
-			gpu_op.relu(input_vals[0], output_val)
+		return np.equal(input_vals[0], input_vals[1])
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
@@ -808,12 +757,9 @@ class ArgMaxOp(Op):
 		new_node.name = "ArgMax(%s)" % (input.name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			output_val[:] = np.argmax(input_vals[0], axis = node.axis)
-		else:
-			gpu_op.relu(input_vals[0], output_val)
+		return np.argmax(input_vals[0], axis = node.axis)
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
@@ -843,14 +789,12 @@ class CastOp(Op):
 		new_node.name = "ArgMax(%s)" % (input.name)
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
+	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		if use_numpy:
-			if node.dtype != None:
-				output_val[:] = node.dtype().exchange(input_vals[0])
+		if node.dtype != None:
+			return node.dtype().exchange(input_vals[0])
 		else:
-			assert False, "undo"
-			gpu_op.relu(input_vals[0], output_val)
+			return input_vals[0]
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
@@ -860,22 +804,6 @@ class CastOp(Op):
 		return input_shapes[0]
 
 
-class NodeShapeOp(Op):
-	def __call__(self, node_A):
-		new_node = Op.__call__(self)
-		new_node.inputs = [node_A]
-		new_node.name = "Shapeto(%s)" % (node_A)
-		return new_node
-
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		assert len(input_vals) == 2
-		output_val[:] = shape[0]
-
-	def gradient(self, node, output_grad):
-		return None
-
-	def infer_shape(self, node, input_shapes):
-		return (1, )
 
 
 class RunnerOp(Op):
@@ -885,8 +813,8 @@ class RunnerOp(Op):
 		new_node.name = "initializer"
 		return new_node
 
-	def compute(self, node, input_vals, output_val, use_numpy = True):
-		pass
+	def compute(self, node, input_vals):
+		return None
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
@@ -920,8 +848,9 @@ log = LogOp()
 equal = EqualOp()
 argmax = ArgMaxOp()
 cast = CastOp()
-nodeshape = NodeShapeOp()
 runner = RunnerOp()
+sqrt = SqrtOp()
+pow = PowOp()
 
 def gradients(output_node, node_list):
 	"""Take gradient of output node with respect to each node in node_list.
@@ -952,7 +881,7 @@ def gradients(output_node, node_list):
 			node_to_output_grads_list[node.inputs[i]].append(
 				input_grads_list[i])
 
-	grad_node_list = [node_to_output_grad[node] for node in node_list]
+	grad_node_list = [node_to_output_grad.get(node, 0) for node in node_list]
 	return grad_node_list
 
 
