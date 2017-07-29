@@ -42,6 +42,7 @@ class ReluGradientOp(Op):
 relu = ReluOp()
 relu_gradient = ReluGradientOp()
 
+
 def softmax(logits, dim = -1, name = None):
 	t = exp(logits)
 	k = reduce_sum(t, axis = dim, keep_dims = True)
@@ -50,5 +51,5 @@ def softmax(logits, dim = -1, name = None):
 
 def softmax_cross_entropy_with_logits(labels, logits, dim = -1):
 	y = softmax(logits)
-	return reduce_mean(-reduce_sum(labels * log(y), reduction_indices=[1]))
+	return reduce_mean(-reduce_sum(labels * log(y), axis = dim))
 

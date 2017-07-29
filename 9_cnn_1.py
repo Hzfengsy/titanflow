@@ -1,5 +1,5 @@
 """ import your model here """
-import tensorflow as tf
+import titanflow as tf
 """ your model should support the following code """
 
 def weight_variable(shape):
