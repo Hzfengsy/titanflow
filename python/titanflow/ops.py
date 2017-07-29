@@ -823,6 +823,47 @@ class RunnerOp(Op):
 		return (1, )
 
 
+class ReshapeOp(Op):
+	def __call__(self, node_A, shape, name = None):
+		"""Creates a node that represents np.zeros(node_A.shape)."""
+		new_node = Op.__call__(self)
+		new_node.inputs = [node_A]
+		new_node.shape = tuple(shape)
+		new_node.name = "Reshape(%s)" % node_A.name
+		return new_node
+
+	def compute(self, node, input_vals):
+		assert len(input_vals) == 1
+		return np.reshape(input_vals[0], newshape.shape)
+
+	def gradient(self, node, output_grad):
+		return reshape_to(output_grad, node.inputs[0])
+
+	def infer_shape(self, node, input_shapes):
+		assert False, "Wrong"
+		return node.shape
+
+
+class ReshapeToOp(Op):
+	def __call__(self, node_A, node_B, name = None):
+		"""Creates a node that represents np.zeros(node_A.shape)."""
+		new_node = Op.__call__(self)
+		new_node.inputs = [node_A, node_B]
+		new_node.name = "ReshapeTo(%s)" % node_A.name
+		return new_node
+
+	def compute(self, node, input_vals):
+		assert len(input_vals) == 1
+		return np.reshape(input_vals[0], input_vals[1].shape)
+
+	def gradient(self, node, output_grad):
+		return reshape_to(output_grad, node.inputs[0].shape)
+
+	def infer_shape(self, node, input_shapes):
+		assert False, "Wrong"
+		return node.shape
+
+
 # Create global singletons of operators.
 add = AddOp()
 sub = SubOp()
@@ -851,6 +892,8 @@ cast = CastOp()
 runner = RunnerOp()
 sqrt = SqrtOp()
 pow = PowOp()
+reshape = ReshapeOp()
+reshape_to = ReshapeToOp()
 
 def gradients(output_node, node_list):
 	"""Take gradient of output node with respect to each node in node_list.
