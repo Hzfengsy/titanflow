@@ -14,8 +14,7 @@ def conv2d(x, W):
     return tf.nn.conv2d(x, W, strides=[1,1,1,1], padding='SAME')
 
 def max_pool_2x2(x):
-    return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1],
-            padding='SAME')
+    return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
 
 # input
 x = tf.placeholder(tf.float32, shape=[None, 784])
@@ -70,8 +69,8 @@ with tf.Session() as sess:
             train_accuracy = accuracy.eval(feed_dict = { x: batch[0],
                                            y_: batch[1]})
             print('Step %d, trainning accuracy %g' % (i, train_accuracy))
-
         train_step.run(feed_dict={x: batch[0], y_: batch[1]})
+        print 'Step %d finish' % i
 
     ans = accuracy.eval(feed_dict={ x:mnist.test.images,
                                     y_: mnist.test.labels})

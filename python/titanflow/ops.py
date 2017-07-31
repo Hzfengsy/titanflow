@@ -71,8 +71,11 @@ class Node(object):
 		"""Allow print to display node name."""
 		return self.name
 
-	def eval(self, feed_fict = {}):
-		return titanflow._session.sess_t.run(self, feed_fict)
+	def eval(self, feed_dict = {}):
+		return titanflow._session.sess_t.run(self, feed_dict)
+
+	def run(self, feed_dict = {}):
+		return titanflow._session.sess_t.run(self, feed_dict)
 
 
 class Op(object):
@@ -834,10 +837,10 @@ class ReshapeOp(Op):
 
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		return np.reshape(input_vals[0], newshape.shape)
+		return np.reshape(input_vals[0], node.shape)
 
 	def gradient(self, node, output_grad):
-		return reshape_to(output_grad, node.inputs[0])
+		return [reshape_to(output_grad, node.inputs[0])]
 
 	def infer_shape(self, node, input_shapes):
 		assert False, "Wrong"
@@ -853,11 +856,11 @@ class ReshapeToOp(Op):
 		return new_node
 
 	def compute(self, node, input_vals):
-		assert len(input_vals) == 1
+		assert len(input_vals) == 2
 		return np.reshape(input_vals[0], input_vals[1].shape)
 
 	def gradient(self, node, output_grad):
-		return reshape_to(output_grad, node.inputs[0].shape)
+		return [reshape_to(output_grad, node.inputs[0].shape)]
 
 	def infer_shape(self, node, input_shapes):
 		assert False, "Wrong"
@@ -921,8 +924,7 @@ def gradients(output_node, node_list):
 			if node.inputs[i] not in node_to_output_grads_list:
 				node_to_output_grads_list[node.inputs[i]] = []
 			# Calculate partial adjoint for input nodes.
-			node_to_output_grads_list[node.inputs[i]].append(
-				input_grads_list[i])
+			node_to_output_grads_list[node.inputs[i]].append(input_grads_list[i])
 
 	grad_node_list = [node_to_output_grad.get(node, 0) for node in node_list]
 	return grad_node_list
