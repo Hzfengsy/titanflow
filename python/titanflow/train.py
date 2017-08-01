@@ -45,11 +45,11 @@ class AdamOptimizer(object):
 		delta = [0 for i in range(len(grads))]
 		assign_list = []
 		assign_t = assign(self.t, self.t + 1)
-		It_t = self.learning_rate * sqrt(1 - pow(self.beta2, assign_t)) / (1 - pow(self.beta1, assign_t))
+		lr_t = self.learning_rate * sqrt(1 - pow(self.beta2, assign_t)) / (1 - pow(self.beta1, assign_t))
 		for i in range(len(grads)):
 			assign_m[i] = assign(self.m[i], self.beta1 * self.m[i] + (1. - self.beta1) * grads[i])
 			assign_v[i] = assign(self.v[i], self.beta2 * self.v[i] + (1. - self.beta2) * grads[i] * grads[i])
-			delta[i] = It_t * assign_m[i] / (sqrt(assign_v[i]) + self.epsilon)
+			delta[i] = lr_t * assign_m[i] / (sqrt(assign_v[i]) + self.epsilon)
 			assign_list.append(assign(vars[i], vars[i] - delta[i]))
 		return runner(assign_list)
 

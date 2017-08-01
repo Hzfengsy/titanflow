@@ -1,5 +1,16 @@
 import numpy as np
-a = np.arange(3*4*5*6).reshape((3,4,5,6))
-b = np.arange(3*4*5*6)[::-1].reshape((5,4,6,3))
-print np.dot(a, b)[2,3,3,1,2,2]
-print sum(a[2,3,3,:] * b[1,2,:,2])
+import titanflow as tf
+
+X = np.array([1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0]).reshape((1, 4, 4, 1))
+W = np.array([1, 1, 0, 1]).reshape((2, 2, 1, 1))
+
+x = tf.placeholder(tf.float32)
+w = tf.placeholder(tf.float32)
+
+conv = tf.nn.conv2d(x, w, strides=[1,1,1,1], padding='VALID')
+max_pool = tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
+grad_x, grad_w = tf.gradients(conv, [x, w])
+print X[0, :, :, 0]
+print conv.eval(feed_dict = {x: X, w: W})[0, :, :, 0]
+print grad_x.eval(feed_dict = {x: X, w: W})[0, :, :, 0]
+print grad_w.eval(feed_dict = {x: X, w: W})[:, :, 0, 0]
