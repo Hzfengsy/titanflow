@@ -73,17 +73,16 @@ class Conv2dOp(Op):
 			node.out_width = int(ceil(float(node.in_width - node.filter_width + 1) / float(node.strides[2])))
 			node.x = x
 
-		x_cols = np.zeros((node.N * node.out_height * node.out_width, node.filter_height * node.filter_width * node.in_channel))
+		node.x_cols = np.zeros((node.N * node.out_height * node.out_width, node.filter_height * node.filter_width * node.in_channel))
 		indx = 0
 		for n in range(node.N):
 			for i in range(node.filter_height, node.in_height + 1, node.strides[1]):
 				for j in range(node.filter_width, node.in_width + 1, node.strides[2]):
 					tmp = node.x[n, i - node.filter_height:i, j - node.filter_width : j, :]
 					field = tmp.reshape((1, -1))
-					x_cols[indx] = field
+					node.x_cols[indx] = field
 					indx += 1
 		# x_col = N * out_height * out_width, filter_height * filter_width * in_channel
-		node.x_cols = x_cols
 		# w_col = filter_height * filter_width * in_channel, out_channel
 		node.w_cols = w.reshape(-1, node.out_channel)
 		# output_col = N * out_height * out_width, out_channel
@@ -294,6 +293,45 @@ class MaxPoolGradientOp(Op):
 		raise NotImplementedError 
 
 
+class DropOutOP(Op):
+	def __call__(self, input, keep_prob, name = None):
+		"""node_B is output_grad"""
+		new_node = Op.__call__(self)
+		new_node.inputs = [input, keep_prob]
+		new_node.name = "dropout(%s)" % (input)
+		return new_node
+
+	def compute(self, node, input_vals):
+		t = np.random.random(input_vals[0].shape)
+		node.mask = (t < input_vals[1]).astype(np.float32)
+		return input_vals[0] * node.mask
+
+	def gradient(self, node, output_grad):
+		return [dropout_gradient(output_grad, node), 0]
+
+	def infer_shape(self, node, input_shapes):
+		raise NotImplementedError
+
+
+class DropOutGradientOP(Op):
+	def __call__(self, input, node, name = None):
+		"""node_B is output_grad"""
+		new_node = Op.__call__(self)
+		new_node.inputs = [input]
+		new_node.name = "dropout_gradient(%s)" % (input)
+		new_node.node = node
+		return new_node
+
+	def compute(self, node, input_vals):
+		return input_vals[0] * node.node.mask
+
+	def gradient(self, node, output_grad):
+		raise NotImplementedError
+
+	def infer_shape(self, node, input_shapes):
+		raise NotImplementedError
+
+
 conv2d = Conv2dOp()
 conv2d_gradient_dx = Conv2dGradientXOp()
 conv2d_gradient_dw = Conv2dGradientWOp()
@@ -301,7 +339,8 @@ relu = ReluOp()
 relu_gradient = ReluGradientOp()
 max_pool = MaxPoolOp()
 max_pool_gradient = MaxPoolGradientOp()
-
+dropout = DropOutOP()
+dropout_gradient = DropOutGradientOP()
 
 def softmax(logits, dim = -1, name = None):
 	t = exp(logits)

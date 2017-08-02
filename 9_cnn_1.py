@@ -59,18 +59,19 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 
+test_g = tf.gradients(h_conv1, [W_conv1])[0]
+
 
 # train and eval
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    for i in range(200):
+    for i in range(0): # 200
         batch = mnist.train.next_batch(100)
-        if i % 50 == 0:
-            train_accuracy = accuracy.eval(feed_dict = { x: batch[0],
-                                           y_: batch[1]})
+        print test_g.eval(feed_dict = { x: batch[0], y_: batch[1]})[:, :, 0, 0]
+        if i % 10 == 0:
+            train_accuracy = accuracy.eval(feed_dict = { x: batch[0], y_: batch[1]})
             print('Step %d, trainning accuracy %g' % (i, train_accuracy))
         train_step.run(feed_dict={x: batch[0], y_: batch[1]})
-        print 'Step %d finish' % i
 
     ans = accuracy.eval(feed_dict={ x:mnist.test.images,
                                     y_: mnist.test.labels})
