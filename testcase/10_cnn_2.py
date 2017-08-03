@@ -1,5 +1,6 @@
 """ import your model here """
 import your_model as tf
+# import python.titanflow as tf
 """ your model should support the following code """
 
 def weight_variable(shape):
@@ -76,8 +77,7 @@ with tf.Session() as sess:
 
         train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
 
-    ans = accuracy.eval(feed_dict={ x:mnist.test.images[:1000, :],
-                                    y_: mnist.test.labels[:1000, :], keep_prob: 1.0})
+    ans = accuracy.eval(feed_dict={ x:mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0})
     print('test accuracy %g' % ans)
     assert ans > 0.92
 

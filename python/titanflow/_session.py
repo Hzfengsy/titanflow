@@ -2,6 +2,7 @@ import numpy as np
 # from . import ndarray, gpu_op
 from .ops import *
 
+
 # f = open('log.txt', 'w')
 class Session(object):
 	def __init__(self, ctx = None):
@@ -119,7 +120,7 @@ class Session(object):
 					node_to_val_map[node] = value
 				else:
 					assert False, "feed_dict value type not supported"
-		
+
 		# collect shapes for all placeholders
 		# feed_shapes = {}
 		# for node in node_to_val_map:
@@ -131,7 +132,7 @@ class Session(object):
 		# 	# 	print node.shape
 		# 	# 	print feed_shapes[node]
 		# 	# 	assert feed_shapes[node] == node.shape
-			
+
 
 		# # infer shape if feed_shapes changed since last run
 		# # e.g. call run() on test data after trainng
@@ -160,5 +161,6 @@ class Session(object):
 			return ans
 		else:
 			return node_to_val_map[eval_node_list]
+
 
 sess_t = Session()

@@ -2,6 +2,7 @@ from .ops import *
 import numpy as np
 from math import ceil
 
+
 class ReluOp(Op):
 	def __call__(self, node_A):
 		new_node = Op.__call__(self)
@@ -66,28 +67,32 @@ class Conv2dOp(Op):
 			node.pad_bottom = node.pad_height - node.pad_top
 			node.pad_left = node.pad_width // 2
 			node.pad_right = node.pad_width - node.pad_left
-			node.x = np.pad(x, ((0, 0), (node.pad_top, node.pad_bottom), (node.pad_left, node.pad_right), (0, 0)), "constant")
+			node.x = np.pad(x, ((0, 0), (node.pad_top, node.pad_bottom), (node.pad_left, node.pad_right), (0, 0)),
+							"constant")
 			node.N, node.in_height, node.in_width, node.in_channel = node.x.shape
 		if node.padding == "VALID":
 			node.out_height = int(ceil(float(node.in_height - node.filter_height + 1) / float(node.strides[1])))
 			node.out_width = int(ceil(float(node.in_width - node.filter_width + 1) / float(node.strides[2])))
 			node.x = x
 
-		node.x_cols = np.zeros((node.N * node.out_height * node.out_width, node.filter_height * node.filter_width * node.in_channel))
-		indx = 0
-		for n in range(node.N):
-			for i in range(node.filter_height, node.in_height + 1, node.strides[1]):
-				for j in range(node.filter_width, node.in_width + 1, node.strides[2]):
-					tmp = node.x[n, i - node.filter_height:i, j - node.filter_width : j, :]
-					field = tmp.reshape((1, -1))
-					node.x_cols[indx] = field
-					indx += 1
-		# x_col = N * out_height * out_width, filter_height * filter_width * in_channel
 		# w_col = filter_height * filter_width * in_channel, out_channel
 		node.w_cols = w.reshape(-1, node.out_channel)
+		node.out_shape = (node.N, node.out_height, node.out_width, node.out_channel)
+		node.outcols_shape = (node.N * node.out_height * node.out_width, node.out_channel)
+		node.output = np.zeros(node.out_shape)
+		x_cols = np.zeros((node.out_height * node.out_width, node.filter_height * node.filter_width * node.in_channel))
+		for n in range(node.N):
+			indx = 0
+			x_rf = node.x[n]
+			for i in range(node.filter_height, node.in_height + 1, node.strides[1]):
+				for j in range(node.filter_width, node.in_width + 1, node.strides[2]):
+					x_cols[indx] = x_rf[i - node.filter_height:i, j - node.filter_width: j, :].reshape(1, -1)
+					indx += 1
+			output_cols = np.dot(x_cols, node.w_cols)
+			node.output[n] = output_cols.reshape(node.out_height, node.out_width, node.out_channel)
+		# x_col = N * out_height * out_width, filter_height * filter_width * in_channel
 		# output_col = N * out_height * out_width, out_channel
-		node.output_cols = np.dot(node.x_cols, node.w_cols)
-		node.output = node.output_cols.reshape(node.N, node.out_height, node.out_width, node.out_channel)
+		# node.output = node.output_cols.reshape(node.N, node.out_height, node.out_width, node.out_channel)
 		# print "Conv finish"
 
 		return node.output
@@ -115,9 +120,9 @@ class Conv2dGradientXOp(Op):
 		x = input_vals[0]
 		w = input_vals[1]
 		dout = input_vals[2]
-		assert dout.shape == node.node.output.shape
+		assert dout.shape == node.node.out_shape
 		# dout_cols = N * out_height * out_width, out_channel
-		dout_cols = dout.reshape(node.node.output_cols.shape)
+		dout_cols = dout.reshape(node.node.outcols_shape)
 		# grad_x_cols = N * out_height * out_width, filter_height * filter_width * in_channel
 		grad_x_cols = np.dot(dout_cols, node.node.w_cols.T)
 		dx_padded = np.zeros((node.node.N, node.node.in_height, node.node.in_width, node.node.in_channel))
@@ -128,9 +133,9 @@ class Conv2dGradientXOp(Op):
 			for i in range(node.node.filter_height, node.node.in_height + 1, node.node.strides[1]):
 				for j in range(node.node.filter_width, node.node.in_width + 1, node.node.strides[2]):
 					tmp = grad_x_cols[idx, :].reshape(tmp_shape)
-					dx_padded[n : n + 1, i - node.node.filter_height : i, j - node.node.filter_width : j, :] += tmp
+					dx_padded[n: n + 1, i - node.node.filter_height: i, j - node.node.filter_width: j, :] += tmp
 					idx += 1
-		
+
 		if (node.node.padding == "SAME"):
 			top = node.node.pad_top
 			bottom = node.node.in_height - node.node.pad_bottom
@@ -143,7 +148,7 @@ class Conv2dGradientXOp(Op):
 			right = node.node.in_width
 
 		# print "Conv dx finish"
-		return dx_padded[:, top : bottom, left : right, :]
+		return dx_padded[:, top: bottom, left: right, :]
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
@@ -167,15 +172,25 @@ class Conv2dGradientWOp(Op):
 		x = input_vals[0]
 		w = input_vals[1]
 		dout = input_vals[2]
-		assert dout.shape == node.node.output.shape
+		assert dout.shape == node.node.out_shape
 		# dout_cols = N * out_height * out_width, out_channel
-		dout_cols = np.reshape(dout, node.node.output_cols.shape)
+		dout_cols = np.reshape(dout, (node.node.N, node.node.out_height * node.node.out_width, node.node.out_channel))
 		# grad_w = filter_height * filter_width * in_channel, out_channel
-		grad_w = np.dot(node.node.x_cols.T, dout_cols)
+		grad_w = np.zeros((node.node.filter_height * node.node.filter_width * node.node.in_channel, node.node.out_channel))
+		x_cols = np.zeros((node.node.out_height * node.node.out_width, node.node.filter_height * node.node.filter_width * node.node.in_channel))
+		for n in range(node.node.N):
+			indx = 0
+			x_rf = node.node.x[n]
+			for i in range(node.node.filter_height, node.node.in_height + 1, node.node.strides[1]):
+				for j in range(node.node.filter_width, node.node.in_width + 1, node.node.strides[2]):
+					x_cols[indx] = x_rf[i - node.node.filter_height:i, j - node.node.filter_width: j, :].reshape(1, -1)
+					indx += 1
+			d_w = np.dot(x_cols.T, dout_cols[n])
+			grad_w += d_w
 
 		# print "Conv dW finish"
-		return  np.reshape(grad_w, w.shape)
-		
+		return np.reshape(grad_w, w.shape)
+
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
 
@@ -224,9 +239,9 @@ class MaxPoolOp(Op):
 			yy += 1
 			for j in range(0, in_width - ksize[2] + 1, strides[2]):
 				xx += 1
-				ans[:, yy, xx, :] = np.amax(x[:, i : i + ksize[1], j : j + ksize[2], :], axis = (1, 2))
+				ans[:, yy, xx, :] = np.amax(x[:, i: i + ksize[1], j: j + ksize[2], :], axis = (1, 2))
 			xx = -1
-		
+
 		# print "Max_pool finish"
 		return ans
 
@@ -279,9 +294,9 @@ class MaxPoolGradientOp(Op):
 			yy += 1
 			for k in range(0, in_width - ksize[2] + 1, strides[2]):
 				xx += 1
-				x_pool = x_with_pad[:, j : j + ksize[1], k : k + ksize[2], :]
+				x_pool = x_with_pad[:, j: j + ksize[1], k: k + ksize[2], :]
 				mask = np.equal(x_pool, np.max(x_pool, axis = (1, 2), keepdims = True))
-				dx[:, j : j + ksize[1], k : k + ksize[2], :] += dout[:, yy : yy + 1, xx : xx + 1, :] * mask
+				dx[:, j: j + ksize[1], k: k + ksize[2], :] += dout[:, yy: yy + 1, xx: xx + 1, :] * mask
 			xx = -1
 		# print "max_pool gradient finish"
 		return dx
@@ -290,7 +305,7 @@ class MaxPoolGradientOp(Op):
 		raise NotImplementedError
 
 	def infer_shape(self, node, input_shapes):
-		raise NotImplementedError 
+		raise NotImplementedError
 
 
 class DropOutOP(Op):
@@ -342,6 +357,7 @@ max_pool_gradient = MaxPoolGradientOp()
 dropout = DropOutOP()
 dropout_gradient = DropOutGradientOP()
 
+
 def softmax(logits, dim = -1, name = None):
 	t = exp(logits)
 	k = reduce_sum(t, axis = dim, keep_dims = True)
@@ -351,4 +367,3 @@ def softmax(logits, dim = -1, name = None):
 def softmax_cross_entropy_with_logits(labels, logits, dim = -1):
 	y = softmax(logits)
 	return reduce_mean(-reduce_sum(labels * log(y), axis = dim))
-

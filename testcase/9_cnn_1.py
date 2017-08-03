@@ -65,9 +65,9 @@ test_g = tf.gradients(h_conv1, [W_conv1])[0]
 # train and eval
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    for i in range(0): # 200
+    for i in range(200): # 200
         batch = mnist.train.next_batch(100)
-        print test_g.eval(feed_dict = { x: batch[0], y_: batch[1]})[:, :, 0, 0]
+        # print test_g.eval(feed_dict = { x: batch[0], y_: batch[1]})[:, :, 0, 0]
         if i % 10 == 0:
             train_accuracy = accuracy.eval(feed_dict = { x: batch[0], y_: batch[1]})
             print('Step %d, trainning accuracy %g' % (i, train_accuracy))

@@ -3,11 +3,12 @@ from __future__ import absolute_import
 
 import numpy as np
 from ._type import *
-import titanflow._session
+
 # from . import ndarray, gpu_op
 
 init_assigns = []
 all_var = []
+
 
 class Node(object):
 	"""Node in a computation graph."""
@@ -72,10 +73,12 @@ class Node(object):
 		return self.name
 
 	def eval(self, feed_dict = {}):
-		return titanflow._session.sess_t.run(self, feed_dict)
+		from ._session import sess_t
+		return sess_t.run(self, feed_dict)
 
 	def run(self, feed_dict = {}):
-		return titanflow._session.sess_t.run(self, feed_dict)
+		from ._session import sess_t
+		return sess_t.run(self, feed_dict)
 
 
 class Op(object):
@@ -201,8 +204,8 @@ class SubOp(Op):
 		assert len(input_shapes) == 2
 		return broadcast_rule(input_shapes[0], input_shapes[1])
 
-class MulOp(Op):
 
+class MulOp(Op):
 	def __call__(self, node_A, node_B):
 		new_node = Op.__call__(self)
 		if not isinstance(node_B, Node):
@@ -242,7 +245,7 @@ class DivOp(Op):
 
 	def gradient(self, node, output_grad):
 		return [reduce_sum_op(output_grad / node.inputs[1], node.inputs[0]),
-			 	reduce_sum_op(-node.inputs[0] * output_grad / node.inputs[1] / node.inputs[1], node.inputs[1])]
+				reduce_sum_op(-node.inputs[0] * output_grad / node.inputs[1] / node.inputs[1], node.inputs[1])]
 
 	def infer_shape(self, node, input_shapes):
 		"""Need to handle input_vals[0].shape != input_vals[1].shape"""
@@ -353,7 +356,7 @@ class ZerosOp(Op):
 
 	def infer_shape(self, node, input_shapes):
 		if len(node.shape) == 0:
-			return (1, )
+			return (1,)
 		return node.shape
 
 
@@ -377,7 +380,7 @@ class OnesLikeOp(Op):
 
 
 class RandomNormalOp(Op):
-	def __call__(self, shape, mean = 0.0, stddev=1.0, dtype = float32, name = None):
+	def __call__(self, shape, mean = 0.0, stddev = 1.0, dtype = float32, name = None):
 		new_node = Op.__call__(self)
 		new_node.name = "zeros %s" % name
 		new_node.shape = shape
@@ -394,7 +397,7 @@ class RandomNormalOp(Op):
 
 	def infer_shape(self, node, input_shapes):
 		if len(node.shape) == 0:
-			return (1, )
+			return (1,)
 		return node.shape
 
 
@@ -468,7 +471,7 @@ class ReduceSumOp(Op):
 		t = np.sum(t, axis = axis, keepdims = node.keep_dims)
 		ans = t.shape
 		if ans == ():
-			return (1, )
+			return (1,)
 		return ans
 
 
@@ -513,7 +516,7 @@ class ReduceMeanOp(Op):
 		t = np.sum(t, axis = axis, keepdims = node.keep_dims)
 		ans = t.shape
 		if ans == ():
-			return (1, )
+			return (1,)
 		return ans
 
 
@@ -540,7 +543,7 @@ class BroadcastToOp(Op):
 			new_shape = tmp.shape
 			if front_align:
 				while len(new_shape) < len(input_vals[1].shape):
-					new_shape = new_shape + (1, )
+					new_shape = new_shape + (1,)
 			tmp.resize(new_shape)
 		return np.broadcast_to(tmp, input_vals[1].shape)
 
@@ -568,7 +571,7 @@ class Initializer(Op):
 		raise NotImplementedError
 
 	def infer_shape(self, node, input_shapes):
-		return (1, )
+		return (1,)
 
 
 class AssignOp(Op):
@@ -583,6 +586,7 @@ class AssignOp(Op):
 			new_node.inputs = [input]
 			new_node.name = "assign(%s, %s)" % (var.name, input)
 		return new_node
+
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
 		node.var.value = input_vals[0]
@@ -594,6 +598,7 @@ class AssignOp(Op):
 	def infer_shape(self, node, input_shapes):
 		node.var.shape = input_shapes[0]
 		return input_shapes[0]
+
 
 class VariableOp(Op):
 	def __call__(self, initial_value, name = None, dtype = None):
@@ -639,8 +644,9 @@ class ConstantOp(Op):
 
 	def infer_shape(self, node, input_shapes):
 		if len(node.shape) == 0:
-			return (1, )
+			return (1,)
 		return node.shape
+
 
 class ExpOp(Op):
 	def __call__(self, input):
@@ -663,6 +669,7 @@ class ExpOp(Op):
 		assert len(input_shapes) == 1
 		return input_shapes[0]
 
+
 class SqrtOp(Op):
 	def __call__(self, input):
 		new_node = Op.__call__(self)
@@ -684,6 +691,7 @@ class SqrtOp(Op):
 		assert len(input_shapes) == 1
 		return input_shapes[0]
 
+
 class PowOp(Op):
 	def __call__(self, node_A, node_B):
 		new_node = Op.__call__(self)
@@ -702,7 +710,7 @@ class PowOp(Op):
 	def gradient(self, node, output_grad):
 		a = node.inputs[0]
 		b = node.inputs[1]
-		return [reduce_sum_op(output_grad * b * pow(a, b - 1), a), 
+		return [reduce_sum_op(output_grad * b * pow(a, b - 1), a),
 				reduce_sum_op(output_grad * pow(a, b) * log(a), node.inputs[1])]
 
 	def infer_shape(self, node, input_shapes):
@@ -777,7 +785,7 @@ class ArgMaxOp(Op):
 		t = np.sum(t, axis = axis)
 		ans = t.shape
 		if ans == ():
-			return (1, )
+			return (1,)
 		return ans
 
 
@@ -807,8 +815,6 @@ class CastOp(Op):
 		return input_shapes[0]
 
 
-
-
 class RunnerOp(Op):
 	def __call__(self, input_list):
 		new_node = Op.__call__(self)
@@ -823,7 +829,7 @@ class RunnerOp(Op):
 		raise NotImplementedError
 
 	def infer_shape(self, node, input_shapes):
-		return (1, )
+		return (1,)
 
 
 class ReshapeOp(Op):
@@ -897,6 +903,7 @@ sqrt = SqrtOp()
 pow = PowOp()
 reshape = ReshapeOp()
 reshape_to = ReshapeToOp()
+
 
 def gradients(output_node, node_list):
 	"""Take gradient of output node with respect to each node in node_list.
