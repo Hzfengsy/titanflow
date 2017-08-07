@@ -76,23 +76,6 @@ class Conv2dOp(Op):
 			node.out_width = int(ceil(float(node.in_width - node.filter_width + 1) / float(node.strides[2])))
 			x = input_vals[0]
 
-		'''
-		node.x = x
-		node.out_shape = (node.N, node.out_height, node.out_width, node.out_channel)
-		node.outcols_shape = (node.N * node.out_height * node.out_width, node.out_channel)
-		node.w_cols = w.reshape(-1, node.out_channel)
-		node.output = np.zeros(node.out_shape, dtype = x.dtype)
-		x_cols = np.zeros((node.out_height * node.out_width, node.filter_height * node.filter_width * node.in_channel), dtype = x.dtype)
-		for n in range(node.N):
-			indx = 0
-			x_rf = node.x[n]
-			for i in range(node.filter_height, node.in_height + 1, node.strides[1]):
-				for j in range(node.filter_width, node.in_width + 1, node.strides[2]):
-					x_cols[indx] = x_rf[i - node.filter_height:i, j - node.filter_width: j, :].reshape(1, -1)
-					indx += 1
-			output_cols = np.dot(x_cols, node.w_cols)
-			node.output[n] = output_cols.reshape(node.out_height, node.out_width, node.out_channel)
-		'''
 		node.out_shape = (node.N, node.out_height, node.out_width, node.out_channel)
 		node.outcols_shape = (node.N * node.out_height * node.out_width, node.out_channel)
 		x = x.astype(np.float32)
@@ -152,18 +135,6 @@ class Conv2dGradientXOp(Op):
 		# grad_x_cols = np.dot(dout_cols, tnode.w_cols.T)
 		dx_padded = np.zeros((tnode.N, tnode.in_height, tnode.in_width, tnode.in_channel), dtype = np.float32)
 
-		'''
-		tmp_shape = (1, tnode.filter_height, tnode.filter_width, tnode.in_channel)
-		for n in range(tnode.N):
-			dout_sub = dout_cols[n]
-			grad_x_cols = np.dot(dout_sub, tnode.w_cols.T)
-			idx = 0
-			for i in range(tnode.filter_height, tnode.in_height + 1, tnode.strides[1]):
-				for j in range(tnode.filter_width, tnode.in_width + 1, tnode.strides[2]):
-					tmp = grad_x_cols[idx, :].reshape(tmp_shape)
-					dx_padded[n: n + 1, i - tnode.filter_height: i, j - tnode.filter_width: j, :] += tmp
-					idx += 1
-		'''
 		w = w.astype(np.float32)
 		w_data = w.ctypes.data_as(POINTER(c_float))
 		dout_data = dout_cols.ctypes.data_as(POINTER(c_float))
@@ -224,19 +195,6 @@ class Conv2dGradientWOp(Op):
 		grad_w = np.zeros(
 			(tnode.filter_height * tnode.filter_width * tnode.in_channel, tnode.out_channel), dtype = np.float32)
 
-		'''
-		x_cols = np.zeros((tnode.out_height * tnode.out_width,
-						   tnode.filter_height * tnode.filter_width * tnode.in_channel), dtype = x.dtype)
-		for n in range(tnode.N):
-			indx = 0
-			x_rf = tnode.x[n]
-			for i in range(tnode.filter_height, tnode.in_height + 1, tnode.strides[1]):
-				for j in range(tnode.filter_width, tnode.in_width + 1, tnode.strides[2]):
-					x_cols[indx] = x_rf[i - tnode.filter_height:i, j - tnode.filter_width: j, :].reshape(1, -1)
-					indx += 1
-			d_w = np.dot(x_cols.T, dout_cols[n])
-			grad_w += d_w
-		'''
 		x_data = x.astype(np.float32).ctypes.data_as(POINTER(c_float))
 		dout_data = dout_cols.ctypes.data_as(POINTER(c_float))
 		grad_w_data = grad_w.ctypes.data_as(POINTER(c_float))
