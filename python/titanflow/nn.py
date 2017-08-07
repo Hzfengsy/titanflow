@@ -4,6 +4,7 @@ from math import ceil
 from ctypes import *
 from _type import *
 
+
 class ReluOp(Op):
 	def __call__(self, node_A):
 		new_node = Op.__call__(self)
@@ -51,7 +52,6 @@ class Conv2dOp(Op):
 		return new_node
 
 	def compute(self, node, input_vals):
-
 		# print "Conv start"
 		node.N, node.in_height, node.in_width, node.in_channel = input_vals[0].shape
 		node.filter_height, node.filter_width, C, node.out_channel = input_vals[1].shape
@@ -67,7 +67,8 @@ class Conv2dOp(Op):
 			node.pad_bottom = node.pad_height - node.pad_top
 			node.pad_left = node.pad_width // 2
 			node.pad_right = node.pad_width - node.pad_left
-			x = np.pad(input_vals[0], ((0, 0), (node.pad_top, node.pad_bottom), (node.pad_left, node.pad_right), (0, 0)),
+			x = np.pad(input_vals[0],
+					   ((0, 0), (node.pad_top, node.pad_bottom), (node.pad_left, node.pad_right), (0, 0)),
 					   "constant")
 			node.N, node.in_height, node.in_width, node.in_channel = x.shape
 		if node.padding == "VALID":
@@ -106,14 +107,14 @@ class Conv2dOp(Op):
 		# output_col = N * out_height * out_width, out_channel
 		# node.output = node.output_cols.reshape(node.N, node.out_height, node.out_width, node.out_channel)
 		# w_col = filter_height * filter_width * in_channel, out_channel
-		lib.conv2d(x_data, w_data, 
+		lib.conv2d(x_data, w_data,
 				   output_data, node.N,
-				   node.in_height, node.in_width, 
-				   node.filter_height, node.filter_width, 
-				   node.out_height, node.out_width, 
-				   node.strides[1], node.strides[2], 
+				   node.in_height, node.in_width,
+				   node.filter_height, node.filter_width,
+				   node.out_height, node.out_width,
+				   node.strides[1], node.strides[2],
 				   node.in_channel, node.out_channel)
-		
+
 		return output
 
 	def gradient(self, node, output_grad):
@@ -137,13 +138,14 @@ class Conv2dGradientXOp(Op):
 		assert len(input_vals) == 3
 		tnode = node.node
 		if tnode.padding == "SAME":
-			x = np.pad(input_vals[0], ((0, 0), (tnode.pad_top, tnode.pad_bottom), (tnode.pad_left, tnode.pad_right), (0, 0)),
+			x = np.pad(input_vals[0],
+					   ((0, 0), (tnode.pad_top, tnode.pad_bottom), (tnode.pad_left, tnode.pad_right), (0, 0)),
 					   "constant")
 		if tnode.padding == "VALID":
 			x = input_vals[0]
 		w = input_vals[1]
 		dout = input_vals[2]
-		
+
 		# dout_cols = N * out_height * out_width, out_channel
 		dout_cols = dout.reshape(tnode.N, tnode.out_height * tnode.out_width, tnode.out_channel).astype(np.float32)
 		# grad_x_cols = N * out_height * out_width, filter_height * filter_width * in_channel
@@ -166,14 +168,14 @@ class Conv2dGradientXOp(Op):
 		w_data = w.ctypes.data_as(POINTER(c_float))
 		dout_data = dout_cols.ctypes.data_as(POINTER(c_float))
 		dx_data = dx_padded.ctypes.data_as(POINTER(c_float))
-		lib.conv2d_dx(w_data, dout_data, 
-				      dx_data, tnode.N,
-				      tnode.in_height, tnode.in_width, 
-				      tnode.filter_height, tnode.filter_width, 
-				      tnode.out_height, tnode.out_width, 
-				      tnode.strides[1], tnode.strides[2], 
-				      tnode.in_channel, tnode.out_channel)
-		
+		lib.conv2d_dx(w_data, dout_data,
+					  dx_data, tnode.N,
+					  tnode.in_height, tnode.in_width,
+					  tnode.filter_height, tnode.filter_width,
+					  tnode.out_height, tnode.out_width,
+					  tnode.strides[1], tnode.strides[2],
+					  tnode.in_channel, tnode.out_channel)
+
 		if (tnode.padding == "SAME"):
 			top = tnode.pad_top
 			bottom = tnode.in_height - tnode.pad_bottom
@@ -208,7 +210,8 @@ class Conv2dGradientWOp(Op):
 		assert len(input_vals) == 3
 		tnode = node.node
 		if tnode.padding == "SAME":
-			x = np.pad(input_vals[0], ((0, 0), (tnode.pad_top, tnode.pad_bottom), (tnode.pad_left, tnode.pad_right), (0, 0)),
+			x = np.pad(input_vals[0],
+					   ((0, 0), (tnode.pad_top, tnode.pad_bottom), (tnode.pad_left, tnode.pad_right), (0, 0)),
 					   "constant")
 		if tnode.padding == "VALID":
 			x = input_vals[0]
@@ -238,15 +241,14 @@ class Conv2dGradientWOp(Op):
 		dout_data = dout_cols.ctypes.data_as(POINTER(c_float))
 		grad_w_data = grad_w.ctypes.data_as(POINTER(c_float))
 
-		lib.conv2d_dw(x_data, dout_data, 
-				      grad_w_data, tnode.N,
-				      tnode.in_height, tnode.in_width, 
-				      tnode.filter_height, tnode.filter_width, 
-				      tnode.out_height, tnode.out_width, 
-				      tnode.strides[1], tnode.strides[2], 
-				      tnode.in_channel, tnode.out_channel)
-		
-		
+		lib.conv2d_dw(x_data, dout_data,
+					  grad_w_data, tnode.N,
+					  tnode.in_height, tnode.in_width,
+					  tnode.filter_height, tnode.filter_width,
+					  tnode.out_height, tnode.out_width,
+					  tnode.strides[1], tnode.strides[2],
+					  tnode.in_channel, tnode.out_channel)
+
 		return grad_w.reshape(w.shape)
 
 	def gradient(self, node, output_grad):

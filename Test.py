@@ -28,5 +28,3 @@ for i in range(100):
 	pool = None
 
 print ans
-
-

@@ -5,6 +5,7 @@ import numpy as np
 from memory_profiler import profile
 from ._type import *
 from ctypes import *
+
 lib = np.ctypeslib.load_library("./src/core.so", ".")
 
 # from . import ndarray, gpu_op
