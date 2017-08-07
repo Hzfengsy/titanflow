@@ -88,7 +88,6 @@ class Conv2dOp(Op):
 		output_data = output.ctypes.data_as(POINTER(c_float))
 		# x_col = N * out_height * out_width, filter_height * filter_width * in_channel
 		# output_col = N * out_height * out_width, out_channel
-		# node.output = node.output_cols.reshape(node.N, node.out_height, node.out_width, node.out_channel)
 		# w_col = filter_height * filter_width * in_channel, out_channel
 		lib.conv2d(x_data, w_data,
 				   output_data, node.N,
@@ -251,7 +250,7 @@ class MaxPoolOp(Op):
 			out_height = ceil(float(in_height - ksize[1] + 1) / float(strides[1]))
 			out_width = ceil(float(in_width - ksize[2] + 1) / float(strides[2]))
 
-		ans = np.zeros((N, out_height, out_width, in_channel), dtype = input_vals[0].dtype)
+		ans = np.zeros((N, out_height, out_width, in_channel), dtype = np.float32)
 		xx, yy = -1, -1
 		for i in range(0, in_height - ksize[1] + 1, strides[1]):
 			yy += 1

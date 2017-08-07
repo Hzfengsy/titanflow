@@ -1,6 +1,6 @@
 """ import your model here """
-# import your_model as tf
-import python.titanflow as tf
+import your_model as tf
+#import python.titanflow as tf
 """ your model should support the following code """
 
 def weight_variable(shape):
