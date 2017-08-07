@@ -2,7 +2,10 @@
 from __future__ import absolute_import
 
 import numpy as np
+from memory_profiler import profile
 from ._type import *
+from ctypes import *
+lib = np.ctypeslib.load_library("/Users/fengsiyuan/Onedrive/PycharmProjects/dl-system/src/matmul.so", ".")
 
 # from . import ndarray, gpu_op
 
@@ -331,7 +334,7 @@ class ZerosLikeOp(Op):
 
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		return np.zeros(input_vals[0].shape)
+		return np.zeros(input_vals[0].shape, dtype = input_vals[0].dtype)
 
 	def gradient(self, node, output_grad):
 		return [zeroslike(node.inputs[0])]
@@ -349,10 +352,10 @@ class ZerosOp(Op):
 		return new_node
 
 	def compute(self, node, input_vals):
-		return np.zeros(node.shape, node.dtype)
+		return node.dtype().exchange(np.zeros(node.shape))
 
 	def gradient(self, node, output_grad):
-		return np.zeros(node.shape, node.dtype)
+		return node.dtype().exchange(np.zeros(node.shape))
 
 	def infer_shape(self, node, input_shapes):
 		if len(node.shape) == 0:
@@ -370,7 +373,7 @@ class OnesLikeOp(Op):
 
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		return np.ones(input_vals[0].shape)
+		return np.ones(input_vals[0].shape, dtype = input_vals[0].dtype)
 
 	def gradient(self, node, output_grad):
 		return [zeroslike(node.inputs[0])]
@@ -452,7 +455,7 @@ class ReduceSumOp(Op):
 			axis = tuple(node.axis)
 		else:
 			axis = node.axis
-		return np.sum(input_vals[0], axis = axis, keepdims = node.keep_dims)
+		return input_vals[0].sum(axis = axis, keepdims = node.keep_dims)
 
 	def gradient(self, node, output_grad):
 		return [broadcastto(output_grad, node.inputs[0])]
@@ -496,7 +499,7 @@ class ReduceMeanOp(Op):
 			axis = tuple(node.axis)
 		else:
 			axis = node.axis
-		return np.mean(input_vals[0], axis = axis, keepdims = node.keep_dims)
+		return input_vals[0].mean(axis = axis, keepdims = node.keep_dims)
 
 	def gradient(self, node, output_grad):
 		W = reduce_sum(ones_like(node.inputs[0]), axis = node.axis, keep_dims = node.keep_dims)
@@ -603,10 +606,7 @@ class AssignOp(Op):
 class VariableOp(Op):
 	def __call__(self, initial_value, name = None, dtype = None):
 		new_node = Op.__call__(self)
-		if dtype == None:
-			new_node.dtype = float32
-		else:
-			new_node.dtype = dtype
+		new_node.dtype = dtype
 		new_node.name = "Variable(%s)" % name
 		new_node.value = None
 		assign_node = assign(new_node, initial_value)
@@ -615,7 +615,10 @@ class VariableOp(Op):
 		return new_node
 
 	def compute(self, node, input_vals):
-		return node.dtype().exchange(node.value)
+		if node.dtype != None:
+			return node.dtype().exchange(node.value)
+		else:
+			return node.value
 
 	def gradient(self, node, output_grad):
 		return None
@@ -681,7 +684,7 @@ class SqrtOp(Op):
 
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		return np.sqrt(input_vals[0])
+		return np.sqrt(input_vals[0].astype(np.float32))
 
 	def gradient(self, node, output_grad):
 		return [output_grad / sqrt(node.inputs[0])]
@@ -770,7 +773,7 @@ class ArgMaxOp(Op):
 
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		return np.argmax(input_vals[0], axis = node.axis)
+		return input_vals[0].argmax(axis = node.axis)
 
 	def gradient(self, node, output_grad):
 		raise NotImplementedError
@@ -794,7 +797,7 @@ class CastOp(Op):
 		new_node = Op.__call__(self)
 		new_node.inputs = [input]
 		if dtype == "float":
-			new_node.dtype = float32
+			new_node.dtype = float64
 		else:
 			new_node.dtype = dtype
 		new_node.name = "ArgMax(%s)" % (input.name)
@@ -808,7 +811,7 @@ class CastOp(Op):
 			return input_vals[0]
 
 	def gradient(self, node, output_grad):
-		raise NotImplementedError
+		return [cast(output_grad, float32)]
 
 	def infer_shape(self, node, input_shapes):
 		assert len(input_shapes) == 1
@@ -843,7 +846,7 @@ class ReshapeOp(Op):
 
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 1
-		return np.reshape(input_vals[0], node.shape)
+		return input_vals[0].reshape(node.shape)
 
 	def gradient(self, node, output_grad):
 		return [reshape_to(output_grad, node.inputs[0])]
@@ -863,7 +866,7 @@ class ReshapeToOp(Op):
 
 	def compute(self, node, input_vals):
 		assert len(input_vals) == 2
-		return np.reshape(input_vals[0], input_vals[1].shape)
+		return input_vals[0].reshape(input_vals[1].shape)
 
 	def gradient(self, node, output_grad):
 		return [reshape_to(output_grad, node.inputs[0].shape)]
@@ -898,6 +901,7 @@ log = LogOp()
 equal = EqualOp()
 argmax = ArgMaxOp()
 cast = CastOp()
+cast_op = cast
 runner = RunnerOp()
 sqrt = SqrtOp()
 pow = PowOp()

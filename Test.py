@@ -1,18 +1,32 @@
+import multiprocessing as mp
 import numpy as np
-import tensorflow as tf
-# import titanflow as tf
 
-X = np.array([1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0]).reshape((1, 4, 4, 1))
-W = np.array([1, 1, 0, 1]).reshape((2, 2, 1, 1))
 
-x = tf.placeholder(tf.float32)
-w = tf.placeholder(tf.float32)
+def f(x):
+	ans[x] = np.dot(arr[x], t)
 
-conv = tf.nn.conv2d(x, w, strides=[1,1,1,1], padding='SAME')
-max_pool = tf.nn.max_pool(conv, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME')
-grad_x, grad_w = tf.gradients(conv, [x, w])
-sess = tf.Session()
-print X[0, :, :, 0]
-print sess.run(conv, feed_dict = {x: X, w: W})[0, :, :, 0]
-print sess.run(grad_x, feed_dict = {x: X, w: W})[0, :, :, 0]
-print sess.run(grad_w, feed_dict = {x: X, w: W})[:, :, 0, 0]
+
+y = 2
+shared_arr, shared_t, shared_ans = None, None, None
+arr, t, ans = None, None, None
+
+for i in range(100):
+	shared_arr, shared_t, shared_ans = None, None, None
+	arr, t, ans = None, None, None
+	shared_arr = mp.Array("f", 10000000)
+	shared_t = mp.Array("f", 10000000)
+	shared_ans = mp.Array("f", 10000)
+	arr = np.frombuffer(shared_arr.get_obj(), dtype = np.float32).reshape(100, 100000)
+	arr[:] = np.random.random((100, 100000))
+	t = np.frombuffer(shared_arr.get_obj(), dtype = np.float32).reshape(100000, 100)
+	t[:] = arr.T
+	ans = np.frombuffer(shared_ans.get_obj(), dtype = np.float32).reshape(100, 100)
+	arr = np.frombuffer(shared_arr.get_obj(), dtype = np.float32).reshape(100, 100000)
+	arr[:] = np.random.random((100, 100000))
+	pool = mp.Pool(processes = 1)
+	pool.map(f, range(4))
+	pool = None
+
+print ans
+
+

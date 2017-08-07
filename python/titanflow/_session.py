@@ -76,7 +76,6 @@ class Session(object):
 				# self.node_to_arr_map[node] = ndarray.array(feed_shapes[node], ctx = ctx)
 				continue
 			# self.node_to_arr_map[node] = ndarray.empty(self.node_to_shape_map[node], ctx = ctx)
-
 	def run(self, eval_node_list, feed_dict = {}, convert_to_numpy_ret_vals = False):
 		"""
 		Parameters
@@ -104,22 +103,13 @@ class Session(object):
 		use_numpy = self.ctx is None
 		node_to_val_map = {}
 		for node, value in feed_dict.items():
-			if use_numpy:
-				# all values passed in feed_dict must be np.ndarray
-				assert isinstance(node.op, PlaceholderOp)
-				if not isinstance(value, np.ndarray):
-					value = np.array(value)
-				node_to_val_map[node] = value
-				if node.dtype != None:
-					node_to_val_map[node] = node.dtype().exchange(node_to_val_map[node])
-			else:
-				# convert values to ndarray.NDArray if necessary
-				if isinstance(value, np.ndarray):
-					node_to_val_map[node] = ndarray.array(value, ctx = self.ctx)
-				elif isinstance(value, ndarray.NDArray):
-					node_to_val_map[node] = value
-				else:
-					assert False, "feed_dict value type not supported"
+			# all values passed in feed_dict must be np.ndarray
+			assert isinstance(node.op, PlaceholderOp)
+			if not isinstance(value, np.ndarray):
+				value = np.array(value)
+			node_to_val_map[node] = value
+			if node.dtype != None:
+				node_to_val_map[node] = node.dtype().exchange(node_to_val_map[node])
 
 		# collect shapes for all placeholders
 		# feed_shapes = {}
@@ -154,8 +144,6 @@ class Session(object):
 
 		self.last_eval = self.eval_node_list
 		# Collect node values.
-		if not use_numpy and convert_to_numpy_ret_vals:
-			return [node_to_val_map[n].asnumpy() for n in self.eval_node_list]
 		if isinstance(eval_node_list, list):
 			ans = [node_to_val_map[n] for n in self.eval_node_list]
 			return ans

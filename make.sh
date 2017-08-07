@@ -1,0 +1,1 @@
+g++ -o src/matmul.so -shared -fPIC /opt/OpenBLAS/lib/libopenblas.a -fopenmp src/matmul.cpp -O4
