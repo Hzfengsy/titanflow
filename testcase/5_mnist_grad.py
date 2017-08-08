@@ -1,12 +1,11 @@
 """ import your model here """
 import your_model as tf
-import numpy as np
 """ your model should support the following code """
 
 # create model
 x = tf.placeholder(tf.float32, [None, 784])
-W = tf.Variable(tf.zeros([784, 10]), dtype = tf.float32)
-b = tf.Variable(tf.zeros([10]), dtype = tf.float32)
+W = tf.Variable(tf.zeros([784, 10]))
+b = tf.Variable(tf.zeros([10]))
 y = tf.nn.softmax(tf.matmul(x, W) + b)
 
 # define loss and optimizer
@@ -27,7 +26,8 @@ mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
 # train
 for _ in range(1000):
     batch_xs, batch_ys = mnist.train.next_batch(100)
-    sess.run([train_step, W_grad], feed_dict={x: batch_xs, y_: batch_ys})
+    sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys})
+
 # eval
 correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))

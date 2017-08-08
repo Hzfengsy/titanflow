@@ -55,9 +55,7 @@ biases = {
 pred = multilayer_perceptron(x, weights, biases)
 
 # Define loss and optimizer
-# cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
-yy = tf.nn.softmax(pred)
-cost = tf.reduce_mean(-tf.reduce_sum(y * tf.log(yy), reduction_indices=[1]))
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
 optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(cost)
 
 # Initializing the variables
@@ -66,6 +64,7 @@ init = tf.global_variables_initializer()
 # Launch the graph
 with tf.Session() as sess:
     sess.run(init)
+
     # Training cycle
     for epoch in range(training_epochs):
         avg_cost = 0.
@@ -74,7 +73,8 @@ with tf.Session() as sess:
         for i in range(total_batch):
             batch_x, batch_y = mnist.train.next_batch(batch_size)
             # Run optimization op (backprop) and cost op (to get loss value)
-            _, c = sess.run([optimizer, cost], feed_dict={x: batch_x, y: batch_y})
+            _, c = sess.run([optimizer, cost], feed_dict={x: batch_x,
+                                                          y: batch_y})
             # Compute average loss
             avg_cost += c / total_batch
         # Display logs per epoch step

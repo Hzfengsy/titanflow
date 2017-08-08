@@ -28,8 +28,6 @@ feed = {x: [1,2,3,4], y: [0, -1, -2, -3]}
 fixW = tf.assign(W, [-1.0])
 fixb = tf.assign(b, [1.])
 sess.run([fixW, fixb])
-#sess.run(fixW)
-#sess.run(fixb)
 ans = sess.run(error, feed)
 
 assert np.equal(ans, 0)
