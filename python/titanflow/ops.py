@@ -2,7 +2,6 @@
 from __future__ import absolute_import
 
 import numpy as np
-from memory_profiler import profile
 from ._type import *
 from ctypes import *
 
