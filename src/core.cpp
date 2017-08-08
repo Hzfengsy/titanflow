@@ -7,9 +7,9 @@ using namespace std;
 extern "C" {
 void matmul(const float *A, const float *B, float *C, int m, int p, int n, bool TA, bool TB)
 {
-	const enum CBLAS_ORDER Order = CblasRowMajor;
-	const enum CBLAS_TRANSPOSE TransA = TA ? CblasTrans : CblasNoTrans;
-	const enum CBLAS_TRANSPOSE TransB = TB ? CblasTrans : CblasNoTrans;
+	const CBLAS_ORDER Order = CblasRowMajor;
+	const CBLAS_TRANSPOSE TransA = TA ? CblasTrans : CblasNoTrans;
+	const CBLAS_TRANSPOSE TransB = TB ? CblasTrans : CblasNoTrans;
 	const int M = m; //A的行数，C的行数
 	const int N = n; //B的列数，C的列数
 	const int K = p; //A的列数，B的行数
