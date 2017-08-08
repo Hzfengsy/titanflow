@@ -26,16 +26,17 @@ def main(model_name):
 		
 		os.system("cp %s %s" % (os.path.join(testcase_dir, file_name),
 								file_name))
-								os.system("sed -i 's/your_model/%s/' %s" % (model_name, file_name))
-								ret = os.system("%s %s" % (python_cmd, file_name))
-								if ret != 0:
-									exit(0)
-								os.system("rm %s" % (file_name))
-print("")
+		os.system("sed -i 's/your_model/%s/' %s" % (model_name, file_name))
+		ret = os.system("%s %s" % (python_cmd, file_name))
+		if ret != 0:
+			exit(0)
+		os.system("rm %s" % (file_name))
+		print("")
 	print("Pass all!")
 
 if __name__ == "__main__":
 	if (len(sys.argv) != 2):
-	print("Usage: python run_test.py name_of_your_model")
+		print("Usage: python run_test.py name_of_your_model")
+	main(sys.argv[1])
 	exit(0)
-		main(sys.argv[1])
+
