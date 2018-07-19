@@ -53,12 +53,12 @@ class Node(object):
 		new_node = sub(other, self)
 		return new_node
 
-	def __div__(self, other):
+	def __truediv__(self, other):
 		"""Dividing two nodes return a new node."""
 		new_node = div(self, other)
 		return new_node
 
-	def __rdiv__(self, other):
+	def __rtruediv__(self, other):
 		"""Dividing two nodes return a new node."""
 		new_node = div(other, self)
 		return new_node

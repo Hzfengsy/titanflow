@@ -1,7 +1,7 @@
 import os
 import sys
 
-python_cmd = "python"
+python_cmd = "python3"
 testcase_dir = "testcase"
 tests = [
 		 ["adder",	   "1_adder.py"],
@@ -27,7 +27,8 @@ def main(model_name):
 		os.system("cp %s %s" % (os.path.join(testcase_dir, file_name),
 								file_name))
 		os.system("sed -i 's/your_model/%s/' %s" % (model_name, file_name))
-		ret = os.system("%s %s" % (python_cmd, file_name))
+		ret = os.system("%s %s 2> /dev/null" % (python_cmd, file_name))
+		# ret = os.system("%s %s" % (python_cmd, file_name))
 		if ret != 0:
 			exit(0)
 		os.system("rm %s" % (file_name))

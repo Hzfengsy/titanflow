@@ -2,7 +2,7 @@ from .ops import *
 import numpy as np
 from math import ceil
 from ctypes import *
-from _type import *
+from ._type import *
 
 
 class ReluOp(Op):
@@ -240,9 +240,9 @@ class MaxPoolOp(Op):
 			out_width = int(ceil(float(in_width) / float(strides[2])))
 			pad_height = (out_height - 1) * strides[1] + ksize[1] - in_height
 			pad_width = (out_width - 1) * strides[2] + ksize[2] - in_width
-			pad_top = pad_height / 2
+			pad_top = pad_height // 2
 			pad_bottom = pad_height - pad_top
-			pad_left = pad_width / 2
+			pad_left = pad_width // 2
 			pad_right = pad_width - pad_left
 			x = np.pad(x, ((0, 0), (pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), "constant")
 			N, in_height, in_width, in_channel = x.shape
@@ -295,9 +295,9 @@ class MaxPoolGradientOp(Op):
 			out_width = int(ceil(float(in_width) / float(strides[2])))
 			pad_height = (out_height - 1) * strides[1] + ksize[1] - in_height
 			pad_width = (out_width - 1) * strides[2] + ksize[2] - in_width
-			pad_top = pad_height / 2
+			pad_top = pad_height // 2
 			pad_bottom = pad_height - pad_top
-			pad_left = pad_width / 2
+			pad_left = pad_width // 2
 			pad_right = pad_width - pad_left
 			x_with_pad = np.pad(x, ((0, 0), (pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), "constant")
 		if node.padding == "VALID":

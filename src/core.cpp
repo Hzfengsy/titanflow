@@ -2,6 +2,7 @@
 #include <cassert>
 #include <omp.h>
 #include <cblas.h>
+#include <cstring>
 using namespace std;
 
 extern "C" {
@@ -33,15 +34,20 @@ void conv2d(const float *x, const float *w,
 	int mm = out_height * out_width;
 	int pp = filter_height * filter_width * in_channel;
 	int nn = out_channel;
-	#pragma omp parallel for
+	// #pragma omp parallel for
+	float *x_cols = new float[out_height * out_width * filter_height * filter_width * in_channel];
 	for (int n = 0; n < N; n++)
 	{
-		float *x_cols = new float[out_height * out_width * filter_height * filter_width * in_channel]();
-		float *cols_rf = x_cols;
+		memset(x_cols, 0, sizeof(x_cols));
 		const float *x_rf = x + n * in_height * in_width * in_channel;
+		// #pragma omp parallel for
 		for (int i = filter_height; i <= in_height; i += strides_1)
 			for (int j = filter_width; j <= in_width; j += strides_2)
 			{
+				int j_sum = (in_width - filter_width) / strides_2 + 1;
+				int i_index = (i - filter_height) / strides_1;
+				int j_index = (j - filter_width) / strides_2;
+				float *cols_rf = x_cols + (i_index * j_sum + j_index) * filter_height * filter_width * in_channel;
 				int indx = 0;
 				for (int ii = i - filter_height; ii < i; ii++)
 					for (int jj = j - filter_width; jj < j; jj++)
@@ -49,12 +55,10 @@ void conv2d(const float *x, const float *w,
 						{
 							cols_rf[indx++] = x_rf[ii * in_width * in_channel + jj * in_channel + t];
 						}
-				cols_rf += filter_height * filter_width * in_channel;
 			}
 		matmul(x_cols, w, out + n * out_height * out_width * out_channel, mm, pp, nn, false, false);
-		delete[] x_cols;
 	}
-	
+	delete[] x_cols;
 }
 
 void conv2d_dw(const float *x, const float *dout,
@@ -69,10 +73,12 @@ void conv2d_dw(const float *x, const float *dout,
 	int pp = filter_height * filter_width * in_channel;
 	int nn = out_channel;
 	for (int i = 0; i < pp * nn; i++) out[i] = 0;
-	#pragma omp parallel for
+	// #pragma omp parallel for
+	float *x_cols = new float[out_height * out_width * filter_height * filter_width * in_channel];
+	float *temp = new float[pp * nn]();
 	for (int n = 0; n < N; n++)
 	{
-		float *x_cols = new float[out_height * out_width * filter_height * filter_width * in_channel];
+		memset(x_cols, 0, sizeof(x_cols));
 		const float *x_rf = x + n * in_height * in_width * in_channel;
 		float *cols_rf = x_cols;
 		for (int i = filter_height; i <= in_height; i += strides_1)
@@ -87,12 +93,13 @@ void conv2d_dw(const float *x, const float *dout,
 						}
 				cols_rf += filter_height * filter_width * in_channel;
 			}
-		float *temp = new float[pp * nn]();
+		memset(temp, 0, sizeof(temp));
 		matmul(x_cols, dout + n * out_height * out_width * out_channel, temp, pp, mm, nn, true, false);
 		for (int i = 0; i < pp * nn; i++) out[i] += temp[i];
-		delete[] temp;
-		delete[] x_cols;
+		
 	}
+	delete[] temp;
+	delete[] x_cols;
 }
 
 void conv2d_dx(const float *w, const float *dout,
@@ -107,19 +114,23 @@ void conv2d_dx(const float *w, const float *dout,
 	int pp = out_channel;
 	int nn = filter_height * filter_width * in_channel;
 	for (int i = 0; i < N * in_height * in_width * in_channel; i++) out[i] = 0;
-	#pragma omp parallel for
+	// #pragma omp parallel for
+	float *grad_x_cols = new float[mm * nn];
 	for (int n = 0; n < N; n++)
 	{
 		const float *dout_cols = dout + n * out_height * out_width * out_channel;
 		float *out_cols = out + n * in_height * in_width * in_channel;
-		float *grad_x_cols = new float[mm * nn]();
+		memset(grad_x_cols, 0, sizeof(grad_x_cols));
 		// cout << n << " " << flush;
 		matmul(dout_cols, w, grad_x_cols, mm, pp, nn, false, true);
 		// cout << n << endl << flush;
-		float *x_rf = grad_x_cols;
 		for (int i = filter_height; i <= in_height; i += strides_1)
 			for (int j = filter_width; j <= in_width; j += strides_2)
 			{
+				int j_sum = (in_width - filter_width) / strides_2 + 1;
+				int i_index = (i - filter_height) / strides_1;
+				int j_index = (j - filter_width) / strides_2;
+				float *x_rf = grad_x_cols + (i_index * j_sum + j_index) * nn;
 				int indx = 0;
 				for (int ii = i - filter_height; ii < i; ii++)
 					for (int jj = j - filter_width; jj < j; jj++)
@@ -128,10 +139,9 @@ void conv2d_dx(const float *w, const float *dout,
 							out_cols[ii * in_width * in_channel + jj * in_channel + t] += x_rf[indx];
 							indx++;
 						}
-				x_rf += nn;
 			}
-		delete[] grad_x_cols;
 	}
+	delete[] grad_x_cols;
 		// # dout_cols = N * out_height * out_width, out_channel
 		// dout_cols = dout.reshape(tnode.N, tnode.out_height * tnode.out_width, tnode.out_channel)
 		// # grad_x_cols = N * out_height * out_width, filter_height * filter_width * in_channel
